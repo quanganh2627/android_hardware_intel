@@ -17,12 +17,12 @@
 /**
  * @author Alexander V. Astapchuk
  */
- 
+
 /**
  * @file
  * @brief Main encoding routines and structures.
  */
- 
+
 #ifndef __ENC_BASE_H_INCLUDED__
 #define __ENC_BASE_H_INCLUDED__
 
@@ -41,13 +41,13 @@ struct Rex;
 /**
  * @brief Basic facilities for generation of processor's instructions.
  *
- * The class EncoderBase represents the basic facilities for the encoding of 
+ * The class EncoderBase represents the basic facilities for the encoding of
  * processor's instructions on IA32 and EM64T platforms.
- * 
+ *
  * The class provides general interface to generate the instructions as well
- * as to retrieve some static data about instructions (number of arguments, 
+ * as to retrieve some static data about instructions (number of arguments,
  * their roles, etc).
- * 
+ *
  * Currently, the EncoderBase class is used for both LIL and Jitrino code
  * generators. Each of these code generators has its own wrapper to adapt
  * this general interface for specific needs - see encoder.h for LIL wrappers
@@ -55,7 +55,7 @@ struct Rex;
  *
  * Interface is provided through static methods, no instances of EncoderBase
  * to be created.
- * 
+ *
  * @todo RIP-based addressing on EM64T - it's not yet supported currently.
  */
 class EncoderBase {
@@ -71,16 +71,17 @@ public:
      * @returns (stream + length of the just generated instruction)
      */
     static char * encode(char * stream, Mnemonic mn, const Operands& opnds);
-    
+    static char * getOpndLocation(int index);
+
     /**
      * @brief Generates the smallest possible number of NOP-s.
      *
-     * Effectively generates the smallest possible number of instructions, 
+     * Effectively generates the smallest possible number of instructions,
      * which are NOP-s for CPU. Normally used to make a code alignment.
-     * 
+     *
      * The method inserts exactly number of bytes specified. It's a caller's
      * responsibility to make sure the buffer is big enough.
-     * 
+     *
      * @param stream - buffer where to generate code into, can not be NULL
      * @param howMany - how many bytes to fill with NOP-s
      * @return \c (stream+howMany)
@@ -90,16 +91,21 @@ public:
     /**
      * @brief Inserts a prefix into the code buffer.
      *
-     * The method writes no more than one byte into the buffer. This is a 
+     * The method writes no more than one byte into the buffer. This is a
      * caller's responsibility to make sure the buffer is big enough.
-     * 
+     *
      * @param stream - buffer where to insert the prefix
-     * @param pref - prefix to be inserted. If it's InstPrefix_Null, then 
+     * @param pref - prefix to be inserted. If it's InstPrefix_Null, then
      *        no action performed and return value is \c stream.
-     * @return \c (stream+1) if pref is not InstPrefix_Null, or \c stream 
+     * @return \c (stream+1) if pref is not InstPrefix_Null, or \c stream
      *         otherwise
      */
      static char * prefix(char* stream, InstPrefix pref);
+
+    /**
+     * @brief Determines if operand with opndExt suites the position with instExt.
+     */
+    static bool extAllowed(OpndExt opndExt, OpndExt instExt);
 
     /**
      * @brief Returns #MnemonicDesc by the given Mnemonic.
@@ -109,15 +115,15 @@ public:
         assert(mn < Mnemonic_Count);
         return mnemonics + mn;
     }
-    
+
     /**
      * @brief Returns a Mnemonic for the given name.
-     * 
-     * The lookup is case insensitive, if no mnemonic found for the given 
+     *
+     * The lookup is case insensitive, if no mnemonic found for the given
      * string, then Mnemonic_Null returned.
      */
     static Mnemonic str2mnemonic(const char * mn_name);
-    
+
     /**
      * @brief Returns a string representation of the given Mnemonic.
      *
@@ -127,7 +133,7 @@ public:
     {
         return getMnemonicDesc(mn)->name;
     }
-    
+
     static const char * toStr(Mnemonic mn)
     {
         return getMnemonicDesc(mn)->name;
@@ -137,13 +143,13 @@ public:
     /**
      * @brief Description of operand.
      *
-     * Description of an operand in opcode - its kind, size or RegName if 
+     * Description of an operand in opcode - its kind, size or RegName if
      * operand must be a particular register.
      */
     struct OpndDesc {
         /**
          * @brief Location of the operand.
-         * 
+         *
          * May be a mask, i.e. OpndKind_Imm|OpndKind_Mem.
          */
         OpndKind        kind;
@@ -152,8 +158,12 @@ public:
          */
         OpndSize        size;
         /**
+         * @brief Extention of the operand.
+         */
+        OpndExt         ext;
+        /**
          * @brief Appropriate RegName if operand must reside on a particular
-         *        register (i.e. CWD/CDQ instructions), RegName_Null 
+         *        register (i.e. CWD/CDQ instructions), RegName_Null
          *        otherwise.
          */
         RegName         reg;
@@ -177,15 +187,15 @@ public:
         unsigned                useCount;
         /**
          * @brief Operand roles, bit-packed.
-         * 
-         * A bit-packed info about operands' roles. Each operand's role is 
-         * described by two bits, counted from right-to-left - the less 
-         * significant bits (0,1) represent operand#0. 
-         * 
-         * The mask is build by ORing #OpndRole_Def and #OpndRole_Use 
-         * appropriately and shifting left, i.e. operand#0's role would be 
+         *
+         * A bit-packed info about operands' roles. Each operand's role is
+         * described by two bits, counted from right-to-left - the less
+         * significant bits (0,1) represent operand#0.
+         *
+         * The mask is build by ORing #OpndRole_Def and #OpndRole_Use
+         * appropriately and shifting left, i.e. operand#0's role would be
          * - '(OpndRole_Def|OpndRole_Use)'
-         * - opnd#1's role would be 'OpndRole_Use<<2' 
+         * - opnd#1's role would be 'OpndRole_Use<<2'
          * - and operand#2's role would be, say, 'OpndRole_Def<<4'.
          */
         unsigned                roles;
@@ -193,8 +203,8 @@ public:
 
     /**
      * @brief Extracts appropriate OpndRole for a given operand.
-     * 
-     * The order of operands is left-to-right, i.e. for MOV, it 
+     *
+     * The order of operands is left-to-right, i.e. for MOV, it
      * would be 'MOV op0, op1'
      */
     static OpndRole getOpndRoles(OpndRolesDesc ord, unsigned idx)
@@ -204,7 +214,7 @@ public:
     }
 
     /**
-     * @brief Info about single opcode - its opcode bytes, operands, 
+     * @brief Info about single opcode - its opcode bytes, operands,
      *        operands' roles.
      */
    union OpcodeDesc {
@@ -224,7 +234,7 @@ public:
            unsigned    aux1;
            /**
            * @brief Info about opcode's operands.
-           * 
+           *
            * The [3] mostly comes from IDIV/IMUL which both may have up to 3
            * operands.
            */
@@ -250,7 +260,7 @@ public:
     struct MnemonicDesc {
         /**
         * @brief The mnemonic itself.
-        */ 
+        */
         Mnemonic        mn;
         /**
         * Various characteristics of mnemonic.
@@ -260,8 +270,8 @@ public:
         /**
          * @brief Operation's operand's count and roles.
          *
-         * For the operations whose opcodes may use different number of 
-         * operands (i.e. IMUL/SHL) either most common value used, or empty 
+         * For the operations whose opcodes may use different number of
+         * operands (i.e. IMUL/SHL) either most common value used, or empty
          * value left.
          */
         OpndRolesDesc   roles;
@@ -274,7 +284,7 @@ public:
 
     /**
      * @brief Magic number, shows a maximum value a hash code can take.
-     * 
+     *
      * For meaning and arithmetics see enc_tabl.cpp.
      *
      * The value was increased from '5155' to '8192' to make it aligned
@@ -291,8 +301,8 @@ public:
     static const unsigned char              HASH_BITS_PER_OPERAND = 5;
 
     /**
-     * @brief Contains info about a single instructions's operand - its 
-     *        location, size and a value for immediate or RegName for 
+     * @brief Contains info about a single instructions's operand - its
+     *        location, size and a value for immediate or RegName for
      *        register operands.
      */
     class Operand {
@@ -300,12 +310,13 @@ public:
         /**
          * @brief Initializes the instance with empty size and kind.
          */
-        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_need_rex(false) {}
+        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_ext(OpndExt_None), m_need_rex(false) {}
         /**
          * @brief Creates register operand from given RegName.
          */
-        Operand(RegName reg) : m_kind(getRegKind(reg)), 
-                               m_size(getRegSize(reg)), m_reg(reg) 
+        Operand(RegName reg, OpndExt ext = OpndExt_None) : m_kind(getRegKind(reg)),
+                               m_size(getRegSize(reg)),
+                               m_ext(ext), m_reg(reg)
         {
             hash_it();
         }
@@ -314,12 +325,11 @@ public:
          *        specified size and kind.
          *
          * Used to speedup Operand creation as there is no need to extract
-         * size and kind from the RegName. 
+         * size and kind from the RegName.
          * The provided size and kind must match the RegName's ones though.
          */
-        Operand(OpndSize sz, OpndKind kind, RegName reg) : m_kind(kind), 
-                                                           m_size(sz), 
-                                                           m_reg(reg) 
+        Operand(OpndSize sz, OpndKind kind, RegName reg, OpndExt ext = OpndExt_None) :
+            m_kind(kind), m_size(sz), m_ext(ext), m_reg(reg)
         {
             assert(m_size == getRegSize(reg));
             assert(m_kind == getRegKind(reg));
@@ -328,24 +338,24 @@ public:
         /**
          * @brief Creates immediate operand with the given size and value.
          */
-        Operand(OpndSize size, long long ival) : m_kind(OpndKind_Imm), 
-                                                 m_size(size), m_imm64(ival)
+        Operand(OpndSize size, long long ival, OpndExt ext = OpndExt_None) :
+            m_kind(OpndKind_Imm), m_size(size), m_ext(ext), m_imm64(ival)
         {
             hash_it();
         }
         /**
          * @brief Creates immediate operand of OpndSize_32.
          */
-        Operand(int ival) : m_kind(OpndKind_Imm), m_size(OpndSize_32), 
-                            m_imm64(ival)
+        Operand(int ival, OpndExt ext = OpndExt_None) :
+            m_kind(OpndKind_Imm), m_size(OpndSize_32), m_ext(ext), m_imm64(ival)
         {
             hash_it();
         }
         /**
          * @brief Creates immediate operand of OpndSize_16.
          */
-        Operand(short ival) : m_kind(OpndKind_Imm), m_size(OpndSize_16), 
-                              m_imm64(ival)
+        Operand(short ival, OpndExt ext = OpndExt_None) :
+            m_kind(OpndKind_Imm), m_size(OpndSize_16), m_ext(ext), m_imm64(ival)
         {
             hash_it();
         }
@@ -353,8 +363,8 @@ public:
         /**
          * @brief Creates immediate operand of OpndSize_8.
          */
-        Operand(char ival) : m_kind(OpndKind_Imm), m_size(OpndSize_8), 
-                             m_imm64(ival)
+        Operand(char ival, OpndExt ext = OpndExt_None) :
+            m_kind(OpndKind_Imm), m_size(OpndSize_8), m_ext(ext), m_imm64(ival)
         {
             hash_it();
         }
@@ -363,7 +373,7 @@ public:
          * @brief Creates memory operand.
          */
         Operand(OpndSize size, RegName base, RegName index, unsigned scale,
-                int disp) : m_kind(OpndKind_Mem), m_size(size)
+                int disp, OpndExt ext = OpndExt_None) : m_kind(OpndKind_Mem), m_size(size), m_ext(ext)
         {
             m_base = base;
             m_index = index;
@@ -371,12 +381,12 @@ public:
             m_disp = disp;
             hash_it();
         }
-                
+
         /**
          * @brief Creates memory operand with only base and displacement.
          */
-        Operand(OpndSize size, RegName base, int disp) : 
-                               m_kind(OpndKind_Mem), m_size(size)
+        Operand(OpndSize size, RegName base, int disp, OpndExt ext = OpndExt_None) :
+            m_kind(OpndKind_Mem), m_size(size), m_ext(ext)
         {
             m_base = base;
             m_index = RegName_Null;
@@ -395,6 +405,10 @@ public:
          * @brief Returns size of the operand.
          */
         OpndSize size(void) const { return m_size; }
+        /**
+         * @brief Returns extention of the operand.
+         */
+        OpndExt ext(void) const { return m_ext; }
         /**
          * @brief Returns hash of the operand.
          */
@@ -436,6 +450,11 @@ public:
         bool is_mmxreg(void) const { return is_placed_in(OpndKind_MMXReg); }
 #endif
         /**
+         * @brief Tests whether operand is signed immediate operand.
+         */
+        //bool is_signed(void) const { assert(is_imm()); return m_is_signed; }
+
+        /**
          * @brief Returns base of memory operand (RegName_Null if not memory).
          */
         RegName base(void) const { return is_mem() ? m_base : RegName_Null; }
@@ -452,7 +471,7 @@ public:
          */
         int disp(void) const { return is_mem() ? m_disp : 0; }
         /**
-         * @brief Returns RegName of register operand (RegName_Null if not 
+         * @brief Returns RegName of register operand (RegName_Null if not
          *        register).
          */
         RegName reg(void) const { return is_reg() ? m_reg : RegName_Null; }
@@ -464,13 +483,13 @@ public:
         bool is_placed_in(OpndKind kd) const
         {
                 return kd == OpndKind_Reg ?
-                        m_kind == OpndKind_GPReg || 
+                        m_kind == OpndKind_GPReg ||
 #ifdef _HAVE_MMX_
                         m_kind == OpndKind_MMXReg ||
 #endif
-                        m_kind == OpndKind_FPReg || 
-                        m_kind == OpndKind_XMMReg 
-                        : kd == m_kind; 
+                        m_kind == OpndKind_FPReg ||
+                        m_kind == OpndKind_XMMReg
+                        : kd == m_kind;
         }
         void hash_it(void)
         {
@@ -480,7 +499,7 @@ public:
             if (is_reg() && is_em64t_extra_reg(m_reg)) {
                 m_need_rex = true;
             }
-            else if (is_mem() && (is_em64t_extra_reg(m_base) || 
+            else if (is_mem() && (is_em64t_extra_reg(m_base) ||
                                   is_em64t_extra_reg(m_index))) {
                 m_need_rex = true;
             }
@@ -489,6 +508,7 @@ public:
         // general info
         OpndKind    m_kind;
         OpndSize    m_size;
+        OpndExt     m_ext;
         // complex address form support
         RegName     m_base;
         RegName     m_index;
@@ -507,22 +527,22 @@ public:
      */
     class Operands {
     public:
-        Operands(void) 
+        Operands(void)
         {
             clear();
         }
-        Operands(const Operand& op0) 
+        Operands(const Operand& op0)
         {
             clear();
             add(op0);
         }
-    
+
         Operands(const Operand& op0, const Operand& op1)
         {
             clear();
             add(op0); add(op1);
         }
-            
+
         Operands(const Operand& op0, const Operand& op1, const Operand& op2)
         {
             clear();
@@ -562,8 +582,8 @@ public:
 public:
 #ifdef _DEBUG
     /**
-     * Verifies some presumptions about encoding data table. 
-     * Called automagicaly during statics initialization.
+     * Verifies some presumptions about encoding data table.
+     * Called automaticaly during statics initialization.
      */
     static int verify(void);
 #endif
@@ -581,15 +601,15 @@ private:
     /**
      * @brief Encodes special things of opcode description - '/r', 'ib', etc.
      */
-    static char* encode_aux(char* stream, unsigned aux, 
+    static char* encode_aux(char* stream, unsigned aux,
                             const Operands& opnds, const OpcodeDesc * odesc,
                             unsigned * pargsCount, Rex* prex);
 #ifdef _EM64T_
     /**
-     * @brief Returns true if the 'reg' argument represents one of the new 
+     * @brief Returns true if the 'reg' argument represents one of the new
      *        EM64T registers - R8(D)-R15(D).
-     * 
-     * The 64 bits versions of 'old-fashion' registers, i.e. RAX are not 
+     *
+     * The 64 bits versions of 'old-fashion' registers, i.e. RAX are not
      * considered as 'extra'.
      */
     static bool is_em64t_extra_reg(const RegName reg)
@@ -628,14 +648,14 @@ private:
         return false;
     }
     /**
-     * @brief Returns an 'processor's index' of the register - the index 
+     * @brief Returns an 'processor's index' of the register - the index
      *        used to encode the register in ModRM/SIB bytes.
-     * 
-     * For the new EM64T registers the 'HW index' differs from the index 
-     * encoded in RegName. For old-fashion registers it's effectively the 
+     *
+     * For the new EM64T registers the 'HW index' differs from the index
+     * encoded in RegName. For old-fashion registers it's effectively the
      * same as ::getRegIndex(RegName).
      */
-    static unsigned char getHWRegIndex(const RegName reg) 
+    static unsigned char getHWRegIndex(const RegName reg)
     {
         if (getRegKind(reg) != OpndKind_GPReg) {
             return getRegIndex(reg);
@@ -646,7 +666,7 @@ private:
         if (RegName_R8L<= reg && reg<=RegName_R15L) {
             return getRegIndex(reg) - getRegIndex(RegName_R8L);
         }
-        return is_em64t_extra_reg(reg) ? 
+        return is_em64t_extra_reg(reg) ?
                 getRegIndex(reg)-getRegIndex(RegName_R8D) : getRegIndex(reg);
     }
 #else
@@ -663,20 +683,20 @@ public:
     /**
      * @brief A table used for the fast computation of hash value.
      *
-     * A change must be strictly balanced with hash-related functions and data 
+     * A change must be strictly balanced with hash-related functions and data
      * in enc_base.h/.cpp.
-     */ 
+     */
     static const unsigned char size_hash[OpndSize_64+1];
     /**
      * @brief A table used for the fast computation of hash value.
      *
-     * A change must be strictly balanced with hash-related functions and data 
+     * A change must be strictly balanced with hash-related functions and data
      * in enc_base.h/.cpp.
-     */ 
+     */
     static const unsigned char kind_hash[OpndKind_Mem+1];
     /**
      * @brief Maximum number of opcodes used for a single mnemonic.
-     * 
+     *
      * No arithmetics behind the number, simply estimated.
      */
     static const unsigned int   MAX_OPCODES = 32; //20;
@@ -704,6 +724,8 @@ public:
      *        startup.
      */
     static int dummy;
+
+    static char * curRelOpnd[3];
 };
 
 ENCODER_NAMESPACE_END

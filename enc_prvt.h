@@ -26,14 +26,14 @@ ENCODER_NAMESPACE_START
 /*
  * @file
  * @brief Contains some definitions/constants and other stuff used by the
- *        Encoder internally. 
+ *        Encoder internally.
  */
- 
+
 enum OpcodeByteKind {
     //OpcodeByteKind_Opcode = 0x0000,
     OpcodeByteKind_ZeroOpcodeByte           = 0x0100,
     //
-    // The names _SlashR,  _SlahsNum, _ib, _iw, etc 
+    // The names _SlashR,  _SlahsNum, _ib, _iw, etc
     // represent the appropriate abbreviations used
     // in the mnemonic descriptions in the Intel's arch manual.
     //
@@ -65,13 +65,13 @@ enum OpcodeByteKind {
         * a special marker, means 'no opcode on the given position'
         * used in opcodes array, to specify the empty slot, say
         * to fill an em64t-specific opcode on ia32.
-        * last 'e' made lowercase to avoid a mess with 'F' in 
+        * last 'e' made lowercase to avoid a mess with 'F' in
         * OpcodeByteKind_LAST .
         */
     OpcodeByteKind_EMPTY                    = 0xFFFE,
     /**
         * a special marker, means 'no more opcodes in the array'
-        * used in in opcodes array to show that there are no more 
+        * used in in opcodes array to show that there are no more
         * opcodes in the array for a given mnemonic.
         */
     OpcodeByteKind_LAST                     = 0xFFFF,
@@ -135,94 +135,111 @@ enum OpcodeByteKind {
 #define rw          OpcodeByteKind_rw
 #define rd          OpcodeByteKind_rd
 
-#define AL          {OpndKind_GPReg, OpndSize_8, RegName_AL}
-#define AH          {OpndKind_GPReg, OpndSize_8, RegName_AH}
-#define AX          {OpndKind_GPReg, OpndSize_16, RegName_AX}
-#define EAX         {OpndKind_GPReg, OpndSize_32, RegName_EAX}
+#define AL          {OpndKind_GPReg, OpndSize_8, OpndExt_Any, RegName_AL}
+#define AH          {OpndKind_GPReg, OpndSize_8, OpndExt_Any, RegName_AH}
+#define AX          {OpndKind_GPReg, OpndSize_16, OpndExt_Any, RegName_AX}
+#define EAX         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_EAX}
 #ifdef _EM64T_
-    #define RAX     {OpndKind_GPReg, OpndSize_64, RegName_RAX }
+    #define RAX     {OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_RAX }
 #endif
 
-#define CL          {OpndKind_GPReg, OpndSize_8, RegName_CL}
-#define ECX         {OpndKind_GPReg, OpndSize_32, RegName_ECX}
+#define CL          {OpndKind_GPReg, OpndSize_8, OpndExt_Any, RegName_CL}
+#define ECX         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_ECX}
 #ifdef _EM64T_
-    #define RCX         {OpndKind_GPReg, OpndSize_64, RegName_RCX}
+    #define RCX         {OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_RCX}
 #endif
 
-#define DX          {OpndKind_GPReg, OpndSize_16, RegName_DX}
-#define EDX         {OpndKind_GPReg, OpndSize_32, RegName_EDX}
+#define DX          {OpndKind_GPReg, OpndSize_16, OpndExt_Any, RegName_DX}
+#define EDX         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_EDX}
 #ifdef _EM64T_
-    #define RDX     { OpndKind_GPReg, OpndSize_64, RegName_RDX }
+    #define RDX     { OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_RDX }
 #endif
 
-#define ESI         {OpndKind_GPReg, OpndSize_32, RegName_ESI}
+#define ESI         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_ESI}
 #ifdef _EM64T_
-    #define RSI     { OpndKind_GPReg, OpndSize_64, RegName_RSI }
+    #define RSI     { OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_RSI }
 #endif
 
-#define EDI         {OpndKind_GPReg, OpndSize_32, RegName_EDI}
+#define EDI         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_EDI}
 #ifdef _EM64T_
-    #define RDI     { OpndKind_GPReg, OpndSize_64, RegName_RDI }
+    #define RDI     { OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_RDI }
 #endif
 
-#define r8          {OpndKind_GPReg, OpndSize_8, RegName_Null}
-#define r16         {OpndKind_GPReg, OpndSize_16, RegName_Null}
-#define r32         {OpndKind_GPReg, OpndSize_32, RegName_Null}
+#define r8          {OpndKind_GPReg, OpndSize_8, OpndExt_Any, RegName_Null}
+#define r16         {OpndKind_GPReg, OpndSize_16, OpndExt_Any, RegName_Null}
+#define r32         {OpndKind_GPReg, OpndSize_32, OpndExt_Any, RegName_Null}
 #ifdef _EM64T_
-    #define r64     { OpndKind_GPReg, OpndSize_64, RegName_Null }
+    #define r64     { OpndKind_GPReg, OpndSize_64, OpndExt_Any, RegName_Null }
 #endif
 
-#define r_m8        {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_8, RegName_Null}
-#define r_m16       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_16, RegName_Null}
-#define r_m32       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_32, RegName_Null}
+#define r_m8        {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_8, OpndExt_Any, RegName_Null}
+#define r_m16       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_16, OpndExt_Any, RegName_Null}
+#define r_m32       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_32, OpndExt_Any, RegName_Null}
 
-//'m' was only used in LEA mnemonic, but is replaced with 
+#define r_m8s        {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_8, OpndExt_Signed, RegName_Null}
+#define r_m16s       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_16, OpndExt_Signed, RegName_Null}
+#define r_m32s       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_32, OpndExt_Signed, RegName_Null}
+
+#define r_m8u        {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_8, OpndExt_Zero, RegName_Null}
+#define r_m16u       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_16, OpndExt_Zero, RegName_Null}
+#define r_m32u       {(OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_32, OpndExt_Zero, RegName_Null}
+
+//'m' was only used in LEA mnemonic, but is replaced with
 // set of exact sizes. See more comments for LEA instruction in TheTable.
 //#define m           {OpndKind_Mem, OpndSize_Null, RegName_Null}
-#define m8          {OpndKind_Mem, OpndSize_8, RegName_Null}
-#define m16         {OpndKind_Mem, OpndSize_16, RegName_Null}
-#define m32         {OpndKind_Mem, OpndSize_32, RegName_Null}
-#define m64         {OpndKind_Mem, OpndSize_64, RegName_Null}
+#define m8          {OpndKind_Mem, OpndSize_8, OpndExt_Any, RegName_Null}
+#define m16         {OpndKind_Mem, OpndSize_16, OpndExt_Any, RegName_Null}
+#define m32         {OpndKind_Mem, OpndSize_32, OpndExt_Any, RegName_Null}
+#define m64         {OpndKind_Mem, OpndSize_64, OpndExt_Any, RegName_Null}
 #ifdef _EM64T_
-    #define r_m64   { (OpndKind)(OpndKind_GPReg|OpndKind_Mem),      OpndSize_64, RegName_Null }
+    #define r_m64   { (OpndKind)(OpndKind_GPReg|OpndKind_Mem), OpndSize_64, OpndExt_Any, RegName_Null }
 #endif
 
-#define imm8        {OpndKind_Imm, OpndSize_8, RegName_Null}
-#define imm16       {OpndKind_Imm, OpndSize_16, RegName_Null}
-#define imm32       {OpndKind_Imm, OpndSize_32, RegName_Null}
+#define imm8        {OpndKind_Imm, OpndSize_8, OpndExt_Any, RegName_Null}
+#define imm16       {OpndKind_Imm, OpndSize_16, OpndExt_Any, RegName_Null}
+#define imm32       {OpndKind_Imm, OpndSize_32, OpndExt_Any, RegName_Null}
+
+#define imm8s        {OpndKind_Imm, OpndSize_8, OpndExt_Signed, RegName_Null}
+#define imm16s       {OpndKind_Imm, OpndSize_16, OpndExt_Signed, RegName_Null}
+#define imm32s       {OpndKind_Imm, OpndSize_32, OpndExt_Signed, RegName_Null}
+
+#define imm8u        {OpndKind_Imm, OpndSize_8, OpndExt_Zero, RegName_Null}
+#define imm16u       {OpndKind_Imm, OpndSize_16, OpndExt_Zero, RegName_Null}
+#define imm32u       {OpndKind_Imm, OpndSize_32, OpndExt_Zero, RegName_Null}
+
 #ifdef _EM64T_
-    #define imm64   {OpndKind_Imm, OpndSize_64, RegName_Null }
+    #define imm64   {OpndKind_Imm, OpndSize_64, OpndExt_Any, RegName_Null }
 #endif
 
 //FIXME: moff-s are in fact memory refs, but presented as immediate.
 // Need to specify this in OpndDesc.
-#define moff8        {OpndKind_Imm, OpndSize_32, RegName_Null}
-#define moff16       {OpndKind_Imm, OpndSize_32, RegName_Null}
-#define moff32       {OpndKind_Imm, OpndSize_32, RegName_Null}
+#define moff8        {OpndKind_Imm, OpndSize_32, OpndExt_Any, RegName_Null}
+#define moff16       {OpndKind_Imm, OpndSize_32, OpndExt_Any, RegName_Null}
+#define moff32       {OpndKind_Imm, OpndSize_32, OpndExt_Any, RegName_Null}
 #ifdef _EM64T_
-    #define moff64       {OpndKind_Imm, OpndSize_64, RegName_Null}
+    #define moff64       {OpndKind_Imm, OpndSize_64, OpndExt_Any, RegName_Null}
 #endif
 
 
-#define rel8        {OpndKind_Imm, OpndSize_8, RegName_Null}
-#define rel16       {OpndKind_Imm, OpndSize_16, RegName_Null}
-#define rel32       {OpndKind_Imm, OpndSize_32, RegName_Null}
+#define rel8        {OpndKind_Imm, OpndSize_8, OpndExt_Any, RegName_Null}
+#define rel16       {OpndKind_Imm, OpndSize_16, OpndExt_Any, RegName_Null}
+#define rel32       {OpndKind_Imm, OpndSize_32, OpndExt_Any, RegName_Null}
 
-#define mm64        {OpndKind_MMXReg, OpndSize_64, RegName_Null}
-#define mm_m64      {(OpndKind)(OpndKind_MMXReg|OpndKind_Mem), OpndSize_64, RegName_Null} 
+#define mm64        {OpndKind_MMXReg, OpndSize_64, OpndExt_Any, RegName_Null}
+#define mm_m64      {(OpndKind)(OpndKind_MMXReg|OpndKind_Mem), OpndSize_64, OpndExt_Any, RegName_Null}
 
-#define xmm64       {OpndKind_XMMReg, OpndSize_64, RegName_Null}
-#define xmm_m64     {(OpndKind)(OpndKind_XMMReg|OpndKind_Mem), OpndSize_64, RegName_Null} 
+#define xmm64       {OpndKind_XMMReg, OpndSize_64, OpndExt_Any, RegName_Null}
+#define xmm_m64     {(OpndKind)(OpndKind_XMMReg|OpndKind_Mem), OpndSize_64, OpndExt_Any, RegName_Null}
 
-#define xmm32       {OpndKind_XMMReg, OpndSize_32, RegName_Null}
-#define xmm_m32     {(OpndKind)(OpndKind_XMMReg|OpndKind_Mem), OpndSize_32, RegName_Null}
+#define xmm32       {OpndKind_XMMReg, OpndSize_32, OpndExt_Any, RegName_Null}
+#define xmm_m32     {(OpndKind)(OpndKind_XMMReg|OpndKind_Mem), OpndSize_32, OpndExt_Any, RegName_Null}
 
-#define FP0S        {OpndKind_FPReg, OpndSize_32, RegName_FP0S}
-#define FP0D        {OpndKind_FPReg, OpndSize_64, RegName_FP0D}
-#define FP1S        {OpndKind_FPReg, OpndSize_32, RegName_FP1S}
-#define FP1D        {OpndKind_FPReg, OpndSize_64, RegName_FP1D}
-#define fp32        {OpndKind_FPReg, OpndSize_32, RegName_Null}
-#define fp64        {OpndKind_FPReg, OpndSize_64, RegName_Null}
+#define FP0S        {OpndKind_FPReg, OpndSize_32, OpndExt_Any, RegName_FP0S}
+#define FP0D        {OpndKind_FPReg, OpndSize_64, OpndExt_Any, RegName_FP0D}
+#define FP1S        {OpndKind_FPReg, OpndSize_32, OpndExt_Any, RegName_FP1S}
+#define FP1D        {OpndKind_FPReg, OpndSize_64, OpndExt_Any, RegName_FP1D}
+#define fp32        {OpndKind_FPReg, OpndSize_32, OpndExt_Any, RegName_Null}
+#define fp64        {OpndKind_FPReg, OpndSize_64, OpndExt_Any, RegName_Null}
 
 #ifdef _EM64T_
     #define io      OpcodeByteKind_io
@@ -232,19 +249,19 @@ enum OpcodeByteKind {
 
 #endif // USE_ENCODER_DEFINES
 
-/** 
+/**
  * @brief Represents the REX part of instruction.
  */
 struct  Rex {
-    unsigned char b : 1; 
-    unsigned char x : 1; 
-    unsigned char r : 1; 
+    unsigned char b : 1;
+    unsigned char x : 1;
+    unsigned char r : 1;
     unsigned char w : 1;
     unsigned char dummy : 4;        // must be '0100'b
     unsigned int  :24;
 };
 
-/** 
+/**
  * @brief Describes SIB (scale,index,base) byte.
  */
 struct SIB {
@@ -253,7 +270,7 @@ struct SIB {
     unsigned char scale:2;
     unsigned int  padding:24;
 };
-/** 
+/**
  * @brief Describes ModRM byte.
  */
 struct ModRM
@@ -267,7 +284,7 @@ struct ModRM
 
 
 /**
-* exactly the same as EncoderBase::OpcodeDesc, but also holds info about 
+* exactly the same as EncoderBase::OpcodeDesc, but also holds info about
 * platform on which the opcode is applicable.
 */
 struct OpcodeInfo {
@@ -297,7 +314,7 @@ struct OpcodeInfo {
 
     /**
  * Operation has no special properties.
-    */ 
+    */
 #define MF_NONE             (0x00000000)
     /**
  * Operation affects flags
@@ -316,7 +333,7 @@ struct OpcodeInfo {
  */
 #define MF_SYMMETRIC        (0x00000008)
 /**
- * Operation is XOR-like - XOR, SUB - operations of 'arg,arg' is pure def, 
+ * Operation is XOR-like - XOR, SUB - operations of 'arg,arg' is pure def,
  * without use.
  */
 #define MF_SAME_ARG_NO_USE  (0x00000010)
@@ -324,15 +341,15 @@ struct OpcodeInfo {
 ///@} // ~MNF
 
 /**
- * @see same structure as EncoderBase::MnemonicDesc, but carries 
+ * @see same structure as EncoderBase::MnemonicDesc, but carries
  * MnemonicInfo::OpcodeInfo[] instead of OpcodeDesc[].
- * Only used during prebuilding the encoding tables, thus it's hidden under 
+ * Only used during prebuilding the encoding tables, thus it's hidden under
  * the appropriate define.
  */
 struct MnemonicInfo {
     /**
     * The mnemonic itself
-    */ 
+    */
     Mnemonic    mn;
     /**
      * Various characteristics of mnemonic.
@@ -340,9 +357,9 @@ struct MnemonicInfo {
      */
     unsigned    flags;
     /**
-     * Number of args/des/uses/roles for the operation. For the operations 
-     * which may use different number of operands (i.e. IMUL/SHL) use the 
-     * most common value, or leave '0' if you are sure this info is not 
+     * Number of args/des/uses/roles for the operation. For the operations
+     * which may use different number of operands (i.e. IMUL/SHL) use the
+     * most common value, or leave '0' if you are sure this info is not
      * required.
      */
     EncoderBase::OpndRolesDesc              roles;

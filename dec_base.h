@@ -17,14 +17,14 @@
 /**
  * @author Alexander V. Astapchuk
  */
- 
+
 /**
  * @file
  * @brief Main decoding (disassembling) routines and structures.
  *
  * @note Quick and rough implementation, subject for a change.
  */
- 
+
 #ifndef __DEC_BASE_H_INCLUDED__
 #define __DEC_BASE_H_INCLUDED__
 
@@ -86,12 +86,12 @@ struct Inst {
      */
     unsigned flags;
     /**
-     * An offset of target address, in case of 'CALL offset', 
+     * An offset of target address, in case of 'CALL offset',
      * 'JMP/Jcc offset'.
      */
     //int      offset;
     /**
-     * Direct address of the target (on Intel64/IA-32 is 'instruction IP' + 
+     * Direct address of the target (on Intel64/IA-32 is 'instruction IP' +
      * 'instruction length' + offset).
      */
     //void *   direct_addr;
@@ -115,10 +115,18 @@ public:
     static unsigned decode(const void * addr, Inst * pinst);
 private:
     static bool decodeModRM(const EncoderBase::OpcodeDesc& odesc,
-        const unsigned char ** pbuf, Inst * pinst, const Rex *rex);
+        const unsigned char ** pbuf, Inst * pinst
+#ifdef _EM64T_
+        , const Rex *rex
+#endif
+        );
     static bool decode_aux(const EncoderBase::OpcodeDesc& odesc,
-        unsigned aux, const unsigned char ** pbuf, 
-        Inst * pinst, const Rex *rex);
+        unsigned aux, const unsigned char ** pbuf,
+        Inst * pinst
+#ifdef _EM64T_
+        , const Rex *rex
+#endif
+        );
     static bool try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst);
     static unsigned int fill_prefs( const unsigned char * bytes, Inst * pinst);
     static bool is_prefix(const unsigned char * bytes);

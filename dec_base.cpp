@@ -17,14 +17,16 @@
 /**
  * @author Alexander V. Astapchuk
  */
- 
+
 /**
  * @file
  * @brief Main decoding (disassembling) routines implementation.
  */
 
 #include "dec_base.h"
-#include "open/common.h"
+#include "enc_prvt.h"
+#include <stdio.h>
+//#include "open/common.h"
 
 bool DecoderBase::is_prefix(const unsigned char * bytes)
 {
@@ -95,10 +97,15 @@ unsigned int DecoderBase::fill_prefs(const unsigned char * bytes, Inst * pinst)
         }
         case InstPrefix_OpndSize:
         {
+//NOTE:   prefix does not work for JMP Sz16, the opcode is 0x66 0xe9
+//        here 0x66 will be treated as prefix, try_mn will try to match the code starting at 0xe9
+//        it will match JMP Sz32 ...
+//HACK:   assume it is the last prefix, return any way
             if( 0x0F == by2)
             {
                 return pinst->prefc;
             }
+            return pinst->prefc;
             where = Inst::Group3;
             break;
         }
@@ -134,7 +141,7 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
     Inst tmp;
 
     //assert( *(unsigned char*)addr != 0x66);
-    
+
     const unsigned char * bytes = (unsigned char*)addr;
 
     // Load up to 4 prefixes
@@ -145,12 +152,12 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
         return 0; // Error
 
     bytes += pref_count;
-    
+
     //  for each opcodedesc
     //      if (raw_len == 0) memcmp(, raw_len)
     //  else check the mixed state which is one of the following:
     //      /digit /i /rw /rd /rb
-    
+
     bool found = false;
     const unsigned char * saveBytes = bytes;
     for (unsigned mn=1; mn<Mnemonic_Count; mn++) {
@@ -179,30 +186,48 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
 #define EXTEND_REG(reg, flag) (reg)
 #endif
 
+//don't know the use of rex, seems not used when _EM64T_ is not enabled
 bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
-    const unsigned char ** pbuf, Inst * pinst, const Rex UNREF *rex)
+    const unsigned char ** pbuf, Inst * pinst
+#ifdef _EM64T_
+    , const Rex UNREF *rex
+#endif
+    )
 {
     OpcodeByteKind kind = (OpcodeByteKind)(aux & OpcodeByteKind_KindMask);
     unsigned byte = (aux & OpcodeByteKind_OpcodeMask);
     unsigned data_byte = **pbuf;
     EncoderBase::Operand& opnd = pinst->operands[pinst->argc];
     const EncoderBase::OpndDesc& opndDesc = odesc.opnds[pinst->argc];
-    
+
     switch (kind) {
     case OpcodeByteKind_SlashR:
         //decodeModRM(odesc, pbuf, pinst);
         {
         const ModRM& modrm = *(ModRM*)*pbuf;
         unsigned regIndex = odesc.opnds[0].kind == OpndKind_GPReg ? 0 : 1;
-        RegName reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
+        RegName reg;
+        // Android x86: handle 64-bit registers
+        if(opndDesc.size == OpndSize_64)
+          reg = getRegName(OpndKind_XMMReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
+        else
+          reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
         EncoderBase::Operand& regOpnd = pinst->operands[regIndex];
         if (regIndex == 0) {
             regOpnd = EncoderBase::Operand(reg);
             ++pinst->argc;
-            decodeModRM(odesc, pbuf, pinst, rex);
+            decodeModRM(odesc, pbuf, pinst
+#ifdef _EM64T_
+                        , rex
+#endif
+                        );
         }
         else {
-            decodeModRM(odesc, pbuf, pinst, rex);
+            decodeModRM(odesc, pbuf, pinst
+#ifdef _EM64T_
+                        , rex
+#endif
+                        );
             ++pinst->argc;
             regOpnd = EncoderBase::Operand(reg);
         }
@@ -239,6 +264,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
                 break;
             }
             default:
+                opnd_size = OpndSize_32;  // so there is no compiler warning
                 assert( false );
             }
             opnd = EncoderBase::Operand( getRegName(OpndKind_GPReg, opnd_size, regid) );
@@ -258,7 +284,15 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         return true;
     case OpcodeByteKind_cw:
         // not an error, but not expected in current env
-        return false;
+        // Android x86
+        {
+        short offset = *(short*)*pbuf;
+        *pbuf += 2;
+        opnd = EncoderBase::Operand(offset);
+        ++pinst->argc;
+        }
+        return true;
+        //return false;
     case OpcodeByteKind_cd:
         {
         int offset = *(int*)*pbuf;
@@ -273,7 +307,11 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         if (modrm.reg != byte) {
             return false;
         }
-        decodeModRM(odesc, pbuf, pinst, rex);
+        decodeModRM(odesc, pbuf, pinst
+#ifdef _EM64T_
+                        , rex
+#endif
+                        );
         ++pinst->argc;
         }
         return true;
@@ -283,7 +321,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         opnd = EncoderBase::Operand(ival);
         ++pinst->argc;
         *pbuf += 1;
-        }        
+        }
         return true;
     case OpcodeByteKind_iw:
         {
@@ -291,7 +329,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         opnd = EncoderBase::Operand(ival);
         ++pinst->argc;
         *pbuf += 2;
-        }        
+        }
         return true;
     case OpcodeByteKind_id:
         {
@@ -299,7 +337,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         opnd = EncoderBase::Operand(ival);
         ++pinst->argc;
         *pbuf += 4;
-        }        
+        }
         return true;
 #ifdef _EM64T_
     case OpcodeByteKind_io:
@@ -308,7 +346,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         opnd = EncoderBase::Operand(OpndSize_64, ival);
         ++pinst->argc;
         *pbuf += 8;
-        }        
+        }
         return true;
 #endif
     case OpcodeByteKind_plus_i:
@@ -337,8 +375,8 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
         const EncoderBase::OpcodeDesc& odesc = opcodes[i];
         char *opcode_ptr = const_cast<char *>(odesc.opcode);
         int opcode_len = odesc.opcode_len;
-        Rex *prex = NULL;
 #ifdef _EM64T_
+        Rex *prex = NULL;
         Rex rex;
 #endif
 
@@ -382,12 +420,20 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
             *pbuf += opcode_len;
         }
         if (odesc.aux0 != 0) {
-            
-            if (!decode_aux(odesc, odesc.aux0, pbuf, pinst, prex)) {
+
+            if (!decode_aux(odesc, odesc.aux0, pbuf, pinst
+#ifdef _EM64T_
+                            , prex
+#endif
+                            )) {
                 continue;
             }
             if (odesc.aux1 != 0) {
-                if (!decode_aux(odesc, odesc.aux1, pbuf, pinst, prex)) {
+                if (!decode_aux(odesc, odesc.aux1, pbuf, pinst
+#ifdef _EM64T_
+                            , prex
+#endif
+                            )) {
                     continue;
                 }
             }
@@ -405,19 +451,23 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
 }
 
 bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
-    const unsigned char ** pbuf, Inst * pinst, const Rex *rex)
+    const unsigned char ** pbuf, Inst * pinst
+#ifdef _EM64T_
+    , const Rex *rex
+#endif
+    )
 {
     EncoderBase::Operand& opnd = pinst->operands[pinst->argc];
     const EncoderBase::OpndDesc& opndDesc = odesc.opnds[pinst->argc];
-    
+
     //XXX debug ///assert(0x66 != *(*pbuf-2));
     const ModRM& modrm = *(ModRM*)*pbuf;
     *pbuf += 1;
-    
+
     RegName base = RegName_Null;
     RegName index = RegName_Null;
     int disp = 0;
-    unsigned scale = 0; 
+    unsigned scale = 0;
 
     // On x86_64 all mnemonics that allow REX.W have REX.W in opcode.
     // Therefore REX.W is simply ignored, and opndDesc.size is used
@@ -428,6 +478,8 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         opnd = EncoderBase::Operand(reg);
         return true;
     }
+    //Android x86: m16, m32, m64: mean a byte[word|doubleword] operand in memory
+    //base and index should be 32 bits!!!
     const SIB& sib = *(SIB*)*pbuf;
     // check whether we have a sib
     if (modrm.rm == 4) {
@@ -435,33 +487,35 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         *pbuf += 1;
         scale = sib.scale == 0 ? 0 : (1<<sib.scale);
         if (sib.index != 4) {
-            index = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.index, x));
+            index = getRegName(OpndKind_GPReg, OpndSize_32, EXTEND_REG(sib.index, x)); //Android x86: OpndDesc.size
         } else {
             // (sib.index == 4) => no index
+            //%esp can't be sib.index
         }
 
-        if (sib.base != 5 && modrm.mod != 0) {
-            base = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.base, b));
+        if (sib.base != 5 || modrm.mod != 0) {
+            base = getRegName(OpndKind_GPReg, OpndSize_32, EXTEND_REG(sib.base, b)); //Android x86: OpndDesc.size
         } else {
             // (sib.base == 5 && modrm.mod == 0) => no base
         }
     }
     else {
         if (modrm.mod != 0 || modrm.rm != 5) {
-            base = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
+            base = getRegName(OpndKind_GPReg, OpndSize_32, EXTEND_REG(modrm.rm, b)); //Android x86: OpndDesc.size
         }
         else {
             // mod=0 && rm == 5 => only disp32
         }
     }
-    
+
+    //update disp and pbuf
     if (modrm.mod == 2) {
-        // have disp32 
+        // have disp32
         disp = *(int*)*pbuf;
         *pbuf += 4;
     }
     else if (modrm.mod == 1) {
-        // have disp8 
+        // have disp8
         disp = *(char*)*pbuf;
         *pbuf += 1;
     }

@@ -18,7 +18,7 @@
  * @author Alexander V. Astapchuk
  */
 #include "enc_base.h"
-#include <climits>
+//#include <climits>
 #include <string.h>
 #define USE_ENCODER_DEFINES
 #include "enc_prvt.h"
@@ -66,7 +66,7 @@ const unsigned char EncoderBase::kind_hash[OpndKind_Mem+1] = {
     //mmx reg               -> 110 = 6
     //
     0xFF,                          // 0    OpndKind_Null=0,
-    0<<2,                          // 1    OpndKind_GPReg = 
+    0<<2,                          // 1    OpndKind_GPReg =
                                    //           OpndKind_MinRegKind=0x1,
     4<<2,                          // 2    OpndKind_SReg=0x2,
 
@@ -79,10 +79,10 @@ const unsigned char EncoderBase::kind_hash[OpndKind_Mem+1] = {
     5<<2,                          // 4    OpndKind_FPReg=0x4,
     0xFF, 0xFF, 0xFF,              // 5, 6, 7
     3<<2,                                   //      OpndKind_XMMReg=0x8,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 9, 0xA, 0xB, 0xC, 0xD, 
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 9, 0xA, 0xB, 0xC, 0xD,
                                               // 0xE, 0xF
-    0xFF,                          // OpndKind_MaxRegKind = 
-                                   // OpndKind_StatusReg = 
+    0xFF,                          // OpndKind_MaxRegKind =
+                                   // OpndKind_StatusReg =
                                    // OpndKind_OtherReg=0x10,
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0x11-0x18
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,               // 0x19-0x1F
@@ -94,22 +94,24 @@ const unsigned char EncoderBase::kind_hash[OpndKind_Mem+1] = {
     1<<2,                                   // OpndKind_Memory=0x40
 };
 
+char * EncoderBase::curRelOpnd[3];
+
 char* EncoderBase::encode_aux(char* stream, unsigned aux,
                               const Operands& opnds, const OpcodeDesc * odesc,
                               unsigned * pargsCount, Rex * prex)
 {
     const unsigned byte = aux;
     OpcodeByteKind kind = (OpcodeByteKind)(byte & OpcodeByteKind_KindMask);
-    // The '>>' here is to force the switch to be table-based) instead of 
+    // The '>>' here is to force the switch to be table-based) instead of
     // set of CMP+Jcc.
     switch(kind>>8) {
     case OpcodeByteKind_SlashR>>8:
-        // /r - Indicates that the ModR/M byte of the instruction contains 
+        // /r - Indicates that the ModR/M byte of the instruction contains
         // both a register operand and an r/m operand.
         {
         assert(opnds.count() > 1);
     // not true anymore for MOVQ xmm<->r
-        //assert((odesc->opnds[0].kind & OpndKind_Mem) || 
+        //assert((odesc->opnds[0].kind & OpndKind_Mem) ||
         //       (odesc->opnds[1].kind & OpndKind_Mem));
         unsigned memidx = odesc->opnds[0].kind & OpndKind_Mem ? 0 : 1;
         unsigned regidx = memidx == 0 ? 1 : 0;
@@ -139,10 +141,10 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
         }
         break;
     case OpcodeByteKind_SlashNum>>8:
-        //  /digit - A digit between 0 and 7 indicates that the 
-        //  ModR/M byte of the instruction uses only the r/m 
-        //  (register or memory) operand. The reg field contains 
-        //  the digit that provides an extension to the instruction's 
+        //  /digit - A digit between 0 and 7 indicates that the
+        //  ModR/M byte of the instruction uses only the r/m
+        //  (register or memory) operand. The reg field contains
+        //  the digit that provides an extension to the instruction's
         //  opcode.
         {
         const unsigned lowByte = (byte & OpcodeByteKind_OpcodeMask);
@@ -168,10 +170,10 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
         }
         break;
     case OpcodeByteKind_plus_i>>8:
-        //  +i - A number used in floating-point instructions when one 
-        //  of the operands is ST(i) from the FPU register stack. The 
-        //  number i (which can range from 0 to 7) is added to the 
-        //  hexadecimal byte given at the left of the plus sign to form 
+        //  +i - A number used in floating-point instructions when one
+        //  of the operands is ST(i) from the FPU register stack. The
+        //  number i (which can range from 0 to 7) is added to the
+        //  hexadecimal byte given at the left of the plus sign to form
         //  a single opcode byte.
         {
             unsigned idx = *pargsCount;
@@ -187,10 +189,10 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
 #ifdef _EM64T_
     case OpcodeByteKind_io>>8:
 #endif //_EM64T_
-        //  ib, iw, id - A 1-byte (ib), 2-byte (iw), or 4-byte (id) 
-        //  immediate operand to the instruction that follows the 
-        //  opcode, ModR/M bytes or scale-indexing bytes. The opcode 
-        //  determines if the operand is a signed value. All words 
+        //  ib, iw, id - A 1-byte (ib), 2-byte (iw), or 4-byte (id)
+        //  immediate operand to the instruction that follows the
+        //  opcode, ModR/M bytes or scale-indexing bytes. The opcode
+        //  determines if the operand is a signed value. All words
         //  and double words are given with the low-order byte first.
         {
             unsigned idx = *pargsCount;
@@ -198,20 +200,24 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
             assert(opnds[idx].is_imm());
             if (kind == OpcodeByteKind_ib) {
                 *(unsigned char*)stream = (unsigned char)opnds[idx].imm();
+                curRelOpnd[idx] = stream;
                 stream += 1;
             }
             else if (kind == OpcodeByteKind_iw) {
                 *(unsigned short*)stream = (unsigned short)opnds[idx].imm();
+                curRelOpnd[idx] = stream;
                 stream += 2;
             }
             else if (kind == OpcodeByteKind_id) {
                 *(unsigned*)stream = (unsigned)opnds[idx].imm();
+                curRelOpnd[idx] = stream;
                 stream += 4;
             }
 #ifdef _EM64T_
             else {
                 assert(kind == OpcodeByteKind_io);
                 *(long long*)stream = (long long)opnds[idx].imm();
+                curRelOpnd[idx] = stream;
                 stream += 8;
             }
 #else
@@ -222,20 +228,23 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
         }
         break;
     case OpcodeByteKind_cb>>8:
-        assert(opnds[*pargsCount].is_imm()); 
+        assert(opnds[*pargsCount].is_imm());
         *(unsigned char*)stream = (unsigned char)opnds[*pargsCount].imm();
+        curRelOpnd[*pargsCount]= stream;
         stream += 1;
         *pargsCount += 1;
         break;
     case OpcodeByteKind_cw>>8:
         assert(opnds[*pargsCount].is_imm());
         *(unsigned short*)stream = (unsigned short)opnds[*pargsCount].imm();
+        curRelOpnd[*pargsCount]= stream;
         stream += 2;
         *pargsCount += 1;
         break;
     case OpcodeByteKind_cd>>8:
         assert(opnds[*pargsCount].is_imm());
         *(unsigned*)stream = (unsigned)opnds[*pargsCount].imm();
+        curRelOpnd[*pargsCount]= stream;
         stream += 4;
         *pargsCount += 1;
         break;
@@ -245,14 +254,14 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
     case OpcodeByteKind_rb>>8:
     case OpcodeByteKind_rw>>8:
     case OpcodeByteKind_rd>>8:
-        //  +rb, +rw, +rd - A register code, from 0 through 7, 
-        //  added to the hexadecimal byte given at the left of 
+        //  +rb, +rw, +rd - A register code, from 0 through 7,
+        //  added to the hexadecimal byte given at the left of
         //  the plus sign to form a single opcode byte.
         assert(opnds.count() > 0);
         assert(opnds[*pargsCount].is_reg());
         {
         const unsigned lowByte = (byte & OpcodeByteKind_OpcodeMask);
-        *(unsigned char*)stream = (unsigned char)lowByte + 
+        *(unsigned char*)stream = (unsigned char)lowByte +
                                    getHWRegIndex(opnds[*pargsCount].reg());
 #ifdef _EM64T_
         if (opnds[*pargsCount].need_rex() && needs_rex_r(opnds[*pargsCount].reg())) {
@@ -297,12 +306,12 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
     //  it's explicitly specified by opcode
     // So, if we don't have REX in opcode but need_rex, then set rex here
     // otherwise, wait until opcode is set, and then update REX
-    
+
     bool copy_opcode = true;
     unsigned char _1st = odesc->opcode[0];
-    
-    Rex *prex = (Rex*)stream;    
-    if (opnds.need_rex() && 
+
+    Rex *prex = (Rex*)stream;
+    if (opnds.need_rex() &&
         ((_1st == 0x66) || (_1st == 0xF2 || _1st == 0xF3) && odesc->opcode[1] == 0x0F)) {
         // Special processing
         //
@@ -349,9 +358,9 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
         }
         stream += odesc->opcode_len;
     }
-    
+
     unsigned argsCount = odesc->first_opnd;
-    
+
     if (odesc->aux0) {
         stream = encode_aux(stream, odesc->aux0, opnds, odesc, &argsCount, prex);
         if (odesc->aux1) {
@@ -359,18 +368,18 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
         }
     }
 #ifdef JET_PROTO
-    //saveStream 
+    //saveStream
     Inst inst;
     unsigned len = DecoderBase::decode(saveStream, &inst);
     assert(inst.mn == mn);
     assert(len == (unsigned)(stream-saveStream));
-    if (mn == Mnemonic_CALL || mn == Mnemonic_JMP || 
+    if (mn == Mnemonic_CALL || mn == Mnemonic_JMP ||
         Mnemonic_RET == mn ||
         (Mnemonic_JO<=mn && mn<=Mnemonic_JG)) {
         assert(inst.argc == opnds.count());
-        
+
         InstructionDisassembler idi(saveStream);
-        
+
         for (unsigned i=0; i<inst.argc; i++) {
             const EncoderBase::Operand& original = opnds[i];
             const EncoderBase::Operand& decoded = inst.operands[i];
@@ -423,21 +432,21 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
                 }
             }
         }
-        
+
         Inst inst2;
         len = DecoderBase::decode(saveStream, &inst2);
     }
-    
+
  //   if(idi.get_length_with_prefix() != (int)len) {
 	//__asm { int 3 };
  //   }
 #endif
-    
+
     return stream;
 }
 
 char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
-                               unsigned idx, const OpcodeDesc * odesc, 
+                               unsigned idx, const OpcodeDesc * odesc,
                                Rex * prex)
 {
     const Operand& op = opnds[idx];
@@ -450,7 +459,7 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     // we need SIB if
     //      we have index & scale (nb: having index w/o base and w/o scale
     //      treated as error)
-    //      the base is EBP w/o disp, BUT let's use a fake disp8 
+    //      the base is EBP w/o disp, BUT let's use a fake disp8
     //      the base is ESP (nb: cant have ESP as index)
 
     RegName base = op.base();
@@ -458,12 +467,12 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     if (base == RegName_Null && op.index() == RegName_Null) {
         assert(op.scale() == 0); // 'scale!=0' has no meaning without index
         // ... yes - only have disp
-        // On EM64T, the simply [disp] addressing means 'RIP-based' one - 
+        // On EM64T, the simply [disp] addressing means 'RIP-based' one -
         // must have to use SIB to encode 'DS: based'
 #ifdef _EM64T_
         modrm.mod = 0;  // 00 - ..
         modrm.rm = 4;   // 100 - have SIB
-        
+
         sib.base = 5;   // 101 - none
         sib.index = 4;  // 100 - none
         sib.scale = 0;  //
@@ -474,16 +483,20 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
         modrm.rm = 5;
 #endif
         *(unsigned*)stream = (unsigned)op.disp();
+        curRelOpnd[idx]= stream;
         stream += 4;
         return stream;
     }
-    
+
+    //climits: error when targeting compal
+#define CHAR_MIN -127
+#define CHAR_MAX 127
     const bool disp_fits8 = CHAR_MIN <= op.disp() && op.disp() <= CHAR_MAX;
-    /*&& op.base() != RegName_Null - just checked above*/ 
+    /*&& op.base() != RegName_Null - just checked above*/
     if (op.index() == RegName_Null && getHWRegIndex(op.base()) != getHWRegIndex(REG_STACK)) {
         assert(op.scale() == 0); // 'scale!=0' has no meaning without index
         // ... luckily no SIB, only base and may be a disp
-        
+
         // EBP base is a special case. Need to use [EBP] + disp8 form
         if (op.disp() == 0  && getHWRegIndex(op.base()) != getHWRegIndex(RegName_EBP)) {
             modrm.mod = 0; // mod=00, no disp et all
@@ -491,11 +504,13 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
         else if (disp_fits8) {
             modrm.mod = 1; // mod=01, use disp8
             *(unsigned char*)stream = (unsigned char)op.disp();
+            curRelOpnd[idx]= stream;
             ++stream;
         }
         else {
             modrm.mod = 2; // mod=10, use disp32
             *(unsigned*)stream = (unsigned)op.disp();
+            curRelOpnd[idx]= stream;
             stream += 4;
         }
         modrm.rm = getHWRegIndex(op.base());
@@ -504,15 +519,15 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     }
         return stream;
     }
-    
+
     // cool, we do have SIB.
     ++stream; // bypass SIB in stream
-    
+
     // {E|R}SP cannot be scaled index, however, R12 which has the same index in modrm - can
     assert(op.index() == RegName_Null || !equals(op.index(), REG_STACK));
 
     // Only GPRegs can be encoded in the SIB
-    assert(op.base() == RegName_Null || 
+    assert(op.base() == RegName_Null ||
             getRegKind(op.base()) == OpndKind_GPReg);
     assert(op.index() == RegName_Null ||
             getRegKind(op.index()) == OpndKind_GPReg);
@@ -520,7 +535,7 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     modrm.rm = 4;   // r/m = 100, means 'we have SIB here'
     if (op.base() == RegName_Null) {
         // no base.
-        // already checked above if 
+        // already checked above if
         // the first if() //assert(op.index() != RegName_Null);
 
         modrm.mod = 0;  // mod=00 - here it means 'no base, but disp32'
@@ -528,6 +543,7 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
 
         // encode at least fake disp32 to avoid having [base=ebp]
         *(unsigned*)stream = op.disp();
+        curRelOpnd[idx]= stream;
         stream += 4;
 
         unsigned sc = op.scale();
@@ -549,21 +565,23 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     else if (disp_fits8) {
         modrm.mod = 1;  // mod=01, use disp8
         *(unsigned char*)stream = (unsigned char)op.disp();
+        curRelOpnd[idx]= stream;
         stream += 1;
     }
     else {
-        modrm.mod = 2;  // mod=10, use disp32 
+        modrm.mod = 2;  // mod=10, use disp32
         *(unsigned*)stream = (unsigned)op.disp();
+        curRelOpnd[idx]= stream;
         stream += 4;
     }
 
     if (op.index() == RegName_Null) {
         assert(op.scale() == 0); // 'scale!=0' has no meaning without index
-        // the only reason we're here without index, is that we have {E|R}SP 
-        // or R12 as a base. Another possible reason - EBP without a disp - 
+        // the only reason we're here without index, is that we have {E|R}SP
+        // or R12 as a base. Another possible reason - EBP without a disp -
         // is handled above by adding a fake disp8
 #ifdef _EM64T_
-        assert(op.base() != RegName_Null && (equals(op.base(), REG_STACK) || 
+        assert(op.base() != RegName_Null && (equals(op.base(), REG_STACK) ||
                                              equals(op.base(), RegName_R12)));
 #else  // _EM64T_
         assert(op.base() != RegName_Null && equals(op.base(), REG_STACK));
@@ -581,7 +599,7 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
     if (is_em64t_extra_reg(op.index())) {
         prex->x = 1;
     }
-        // not an error by itself, but the usage of [index*1] instead 
+        // not an error by itself, but the usage of [index*1] instead
         // of [base] is discouraged
         assert(op.base() != RegName_Null || op.scale() != 1);
     }
@@ -637,11 +655,50 @@ char * EncoderBase::prefix(char* stream, InstPrefix pref)
 /**
  *
  */
-static bool try_match(const EncoderBase::OpcodeDesc& odesc, 
-                      const EncoderBase::Operands& opnds, bool strict) {
-                      
+bool EncoderBase::extAllowed(OpndExt opndExt, OpndExt instExt) {
+    if (instExt == opndExt || instExt == OpndExt_Any || opndExt == OpndExt_Any) {
+            return true;
+    }
+//asm("int3");
+assert(0);
+    return false;
+}
+
+/**
+ *
+ */
+static bool match(const EncoderBase::OpcodeDesc& odesc,
+                      const EncoderBase::Operands& opnds) {
+
     assert(odesc.roles.count == opnds.count());
-    
+
+    for(unsigned j = 0; j < odesc.roles.count; j++) {
+        const EncoderBase::OpndDesc& desc = odesc.opnds[j];
+        const EncoderBase::Operand& op = opnds[j];
+        // location must match exactly
+        if ((desc.kind & op.kind()) != op.kind()) {
+//assert(0);
+            return false;
+        }
+        // size must match exactly
+        if (desc.size != op.size()) {
+//assert(0);
+            return false;
+        }
+        // extentions should be consistent
+        if (!EncoderBase::extAllowed(op.ext(), desc.ext)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+static bool try_match(const EncoderBase::OpcodeDesc& odesc,
+                      const EncoderBase::Operands& opnds, bool strict) {
+
+    assert(odesc.roles.count == opnds.count());
+
     for(unsigned j=0; j<odesc.roles.count; j++) {
         // - the location must match exactly
         if ((odesc.opnds[j].kind & opnds[j].kind()) != opnds[j].kind()) {
@@ -655,7 +712,7 @@ static bool try_match(const EncoderBase::OpcodeDesc& odesc,
         }
         else {
             // must match only for def operands, and dont care about use ones
-            // situations like 'mov r8, imm32/mov r32, imm8' so the 
+            // situations like 'mov r8, imm32/mov r32, imm8' so the
             // destination operand defines the overall size
             if (EncoderBase::getOpndRoles(odesc.roles, j) & OpndRole_Def) {
                 if (odesc.opnds[j].size != opnds[j].size()) {
@@ -668,7 +725,7 @@ static bool try_match(const EncoderBase::OpcodeDesc& odesc,
 }
 
 //
-//Subhash implementaion - may be useful in case of many misses during fast 
+//Subhash implementaion - may be useful in case of many misses during fast
 //opcode lookup.
 //
 
@@ -702,7 +759,7 @@ static void put(Mnemonic mn, unsigned hash, unsigned idx)
 }
 #endif
 
-const EncoderBase::OpcodeDesc * 
+const EncoderBase::OpcodeDesc *
 EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
 {
     const unsigned hash = opnds.hash();
@@ -712,7 +769,7 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
         opcodeIndex = find(mn, hash);
     }
 #endif
-    
+
     if (opcodeIndex == NOHASH) {
         // fast-path did no work. try to lookup sequentially
         const OpcodeDesc * odesc = opcodes[mn];
@@ -763,6 +820,12 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
 #endif
     return odesc;
 }
+
+char* EncoderBase::getOpndLocation(int index) {
+     assert(index < 3);
+     return curRelOpnd[index];
+}
+
 
 Mnemonic EncoderBase::str2mnemonic(const char * mn_name)
 {

@@ -21,14 +21,14 @@
  * @file
  * @brief Simple interface for generating processor instructions.
  *
- * The interface works for both IA32 and EM64T. By default, only IA32 
- * capabilities are presented. To enable EM64T feature, the _EM64T_ macro 
+ * The interface works for both IA32 and EM64T. By default, only IA32
+ * capabilities are presented. To enable EM64T feature, the _EM64T_ macro
  * must be defined (and, of course, a proper library version to be used).
- * 
+ *
  * The interface is based on the original ia32.h encoder interface,
  * with some simplifications and add-ons - EM64T-specific, SSE and SSE2.
  *
- * The interface mostly intended for existing legacy code like LIL code 
+ * The interface mostly intended for existing legacy code like LIL code
  * generator. From the implementation point of view, it's just a wrapper
  * around the EncoderBase functionality.
  */
@@ -38,9 +38,9 @@
 
 #include <limits.h>
 #include "enc_base.h"
-#include "open/types.h"
+//#include "open/types.h"
 
-#ifdef _EM64T_ 
+#ifdef _EM64T_
 // size of general-purpose value on the stack in bytes
 #define GR_STACK_SIZE 8
 // size of floating-point value on the stack in bytes
@@ -74,7 +74,7 @@ const int MAX_GR = 0;
 const int MAX_FR = 0;
 #endif
 
-enum Reg_No {
+typedef enum Reg_No {
 #ifdef _EM64T_
     rax_reg = 0,rbx_reg,    rcx_reg,    rdx_reg,
     rdi_reg,    rsi_reg,    rsp_reg,    rbp_reg,
@@ -88,18 +88,18 @@ enum Reg_No {
 #else   // !defined(_EM64T_)
 
     eax_reg = 0,ebx_reg,    ecx_reg,    edx_reg,
-    edi_reg,    esi_reg,    esp_reg,    ebp_reg,        
+    edi_reg,    esi_reg,    esp_reg,    ebp_reg,
     xmm0_reg,   xmm1_reg,   xmm2_reg,   xmm3_reg,
     xmm4_reg,   xmm5_reg,   xmm6_reg,   xmm7_reg,
     fs_reg,
 #endif
     /** @brief Total number of registers.*/
     n_reg
-};
+} Reg_No;
 //
 // instruction operand sizes: 8,16,32,64 bits
 //
-enum Opnd_Size {
+typedef enum Opnd_Size {
     size_8 = 0,
     size_16,
     size_32,
@@ -110,26 +110,26 @@ enum Opnd_Size {
 #else
     size_platf = size_32
 #endif
-};
+} Opnd_Size;
 
 //
 // opcodes for alu instructions
 //
-enum ALU_Opcode {
+typedef enum ALU_Opcode {
     add_opc = 0,or_opc,     adc_opc,    sbb_opc,
     and_opc,    sub_opc,    xor_opc,    cmp_opc,
     n_alu
-};
+} ALU_Opcode;
 
 //
 // opcodes for shift instructions
 //
-enum Shift_Opcode {
+typedef enum Shift_Opcode {
     shld_opc,   shrd_opc,   shl_opc,    shr_opc,
     sar_opc,    ror_opc, max_shift_opcode=6,     n_shift = 6
-};
+} Shift_Opcode;
 
-enum ConditionCode {
+typedef enum ConditionCode {
     Condition_O     = 0,
     Condition_NO    = 1,
     Condition_B     = 2,
@@ -162,12 +162,12 @@ enum ConditionCode {
     Condition_NLE   = 15,
     Condition_G     = Condition_NLE,
     Condition_Count = 16
-};
+} ConditionCode;
 
 //
 // prefix code
 //
-enum InstrPrefix {
+typedef enum InstrPrefix {
     no_prefix,
     lock_prefix                     = 0xF0,
     hint_branch_taken_prefix        = 0x2E,
@@ -183,7 +183,7 @@ enum InstrPrefix {
     prefix_es                       = 0x26,
     prefix_fs                       = 0x64,
     prefix_gs                       = 0x65
-};
+} InstrPrefix;
 
 
 //
@@ -192,7 +192,7 @@ enum InstrPrefix {
 class Opnd {
 
 protected:
-    enum Tag { Imm, Reg, Mem, FP, XMM };
+    enum Tag { SignedImm, UnsignedImm, Reg, Mem, FP, XMM };
 
     const Tag  tag;
 
@@ -212,7 +212,7 @@ private:
     Opnd(const Opnd &): tag(Mem) { assert(false); }
     Opnd& operator=(const Opnd &) { assert(false); return *this; }
 };
-
+typedef int I_32;
 class Imm_Opnd: public Opnd {
 
 protected:
@@ -228,18 +228,28 @@ protected:
     Opnd_Size           size;
 
 public:
-    Imm_Opnd(I_32 val): Opnd(Imm), value(val), size(size_32) {
-        if (CHAR_MIN <= val && val <= CHAR_MAX) {
-            size = size_8;
-        }
-        else if (SHRT_MIN <= val && val <= SHRT_MAX) {
-            size = size_16;
+    Imm_Opnd(I_32 val, bool isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(size_32) {
+        if (isSigned) {
+            if (CHAR_MIN <= val && val <= CHAR_MAX) {
+                size = size_8;
+            } else if (SHRT_MIN <= val && val <= SHRT_MAX) {
+                size = size_16;
+            }
+        } else {
+            assert(val >= 0);
+            if (val <= UCHAR_MAX) {
+                size = size_8;
+            } else if (val <= USHRT_MAX) {
+                size = size_16;
+            }
         }
     }
-    Imm_Opnd(const Imm_Opnd& that): Opnd(Imm), value(that.value), size(that.size) {};
+    Imm_Opnd(const Imm_Opnd& that): Opnd(that.tag), value(that.value), size(that.size) {};
 
 #ifdef _EM64T_
-    Imm_Opnd(Opnd_Size sz, int64 val): Opnd(Imm), value(val), size(sz) {
+    Imm_Opnd(Opnd_Size sz, int64 val, bool isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(sz) {
 #ifndef NDEBUG
         switch (size) {
         case size_8:
@@ -259,12 +269,13 @@ public:
         }
 #endif // NDEBUG
     }
-    
+
     int64 get_value() const { return value; }
 
 #else
 
-    Imm_Opnd(Opnd_Size sz, I_32 val): Opnd(Imm), value(val), size(sz) {
+    Imm_Opnd(Opnd_Size sz, I_32 val, int isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(sz) {
 #ifndef NDEBUG
         switch (size) {
         case size_8:
@@ -282,17 +293,18 @@ public:
         }
 #endif // NDEBUG
     }
-    
+
     I_32 get_value() const { return value; }
 
 #endif
-    Opnd_Size get_size(void) const { return size; }
+    Opnd_Size get_size() const { return size; }
+    bool      is_signed() const { return tag == SignedImm; }
 };
 
 class RM_Opnd: public Opnd {
 
 public:
-    bool is_reg() const { return tag != Imm && tag != Mem; }
+    bool is_reg() const { return tag != SignedImm && tag != UnsignedImm && tag != Mem; }
 
 protected:
     RM_Opnd(Tag t): Opnd(t) {}
@@ -332,11 +344,11 @@ public:
     //M_Opnd(Opnd_Size sz): RM_Opnd(Mem, K_M, sz), m_disp(0), m_scale(0), m_index(n_reg), m_base(n_reg) {}
     M_Opnd(I_32 disp):
         RM_Opnd(Mem), m_disp(disp), m_scale(0), m_index(n_reg), m_base(n_reg) {}
-    M_Opnd(Reg_No rbase, I_32 rdisp): 
+    M_Opnd(Reg_No rbase, I_32 rdisp):
         RM_Opnd(Mem), m_disp(rdisp), m_scale(0), m_index(n_reg), m_base(rbase) {}
     M_Opnd(I_32 disp, Reg_No rbase, Reg_No rindex, unsigned scale):
         RM_Opnd(Mem), m_disp(disp), m_scale(scale), m_index(rindex), m_base(rbase) {}
-    M_Opnd(const M_Opnd & that) : RM_Opnd(Mem), 
+    M_Opnd(const M_Opnd & that) : RM_Opnd(Mem),
         m_disp((int)that.m_disp.get_value()), m_scale((int)that.m_scale.get_value()),
         m_index(that.m_index.reg_no()), m_base(that.m_base.reg_no())
         {}
@@ -448,7 +460,7 @@ extern XMM_Opnd xmm7_opnd;
     #define ENCODER_DECLARE_EXPORT inline
     #include "encoder.inl"
 #endif
- 
+
 // prefix
 ENCODER_DECLARE_EXPORT char * prefix(char * stream, InstrPrefix p);
 
@@ -648,7 +660,7 @@ ENCODER_DECLARE_EXPORT char * fst(char * stream, unsigned i, bool pop_stk);
 
 // stack frame allocation instructions: enter & leave
 //
-//    enter frame_size 
+//    enter frame_size
 //
 //    is equivalent to:
 //

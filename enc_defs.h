@@ -21,7 +21,7 @@
 #define _ENCODER_DEFS_H_
 
 
-// Used to isolate experimental or being tuned encoder into a separate 
+// Used to isolate experimental or being tuned encoder into a separate
 // namespace so it can coexist with a stable one in the same bundle.
 #ifdef ENCODER_ISOLATE
     #define ENCODER_NAMESPACE_START namespace enc_ia32 {
@@ -32,11 +32,12 @@
 #endif
 
 #include <assert.h>
+#include "enc_defs_ext.h"
 
 #ifndef COUNTOF
     /**
      * Number of items in an array.
-     */ 
+     */
     #define COUNTOF(a)      (sizeof(a)/sizeof(a[0]))
 #endif
 
@@ -68,7 +69,7 @@ ENCODER_NAMESPACE_START
 
 
 /**
- * A recommended by Intel Arch Manual aligment for instructions that 
+ * A recommended by Intel Arch Manual aligment for instructions that
  * are targets for jmps.
  */
 #define JMP_TARGET_ALIGMENT     (16)
@@ -76,17 +77,17 @@ ENCODER_NAMESPACE_START
  * A maximum possible size of native instruction.
  */
 #define MAX_NATIVE_INST_SIZE (15)
-/** 
+/**
  * The enum OpndKind describes an operand's location - memory, immediate or a register.
  * It can be used as a bit mask.
  */
-enum OpndKind {
+typedef enum OpndKind {
     /**
      * A change must be balanced with at least the following places:
      *              Ia32::Constraint-s use the OpndKind as a mask
      *              encoder.cpp & encoder_master_info.cpp uses OpndKind as an index for hashing
      *              - perhaps there are much more places
-     * 
+     *
      * NOTE: an MMXReg kind is incompatible with the current constraints framework,
      *              as it's not encoded as a mask.
      */
@@ -108,51 +109,41 @@ enum OpndKind {
     //
     OpndKind_Reg            = 0x1F,
     OpndKind_Any            = 0x7F,
-    // syntetic constants. Normally not used anywhere, but are used for 
+    // syntetic constants. Normally not used anywhere, but are used for
     // human-readable showing under the debugger
     OpndKind_GPReg_Mem      = OpndKind_GPReg|OpndKind_Mem,
 #ifdef _HAVE_MMX_
     OpndKind_MMXReg_Mem     = OpndKind_MMXReg|OpndKind_Mem,
 #endif
     OpndKind_XMMReg_Mem     = OpndKind_XMMReg|OpndKind_Mem,
-};
+} OpndKind;
 
+/**
+ * Defines type of extention allowed for particular operand.
+ * For example imul r32,r_m32,imm8 sign extend imm8 before performing multiplication.
+ * To satisfy instruction constraints immediate operand should be either OpndExt_Signed
+ * or OpndExt_Any.
+ */
+typedef enum OpndExt {
+    OpndExt_None    = 0x0,
+    OpndExt_Signed  = 0x1,
+    OpndExt_Zero    = 0x2,
+    OpndExt_Any     = 0x3,
+}OpndExt;
 
-enum OpndSize {
-    /**
-     * A change must be balanced with at least the following places:
-     *              Ia32IRConstants.h :: getByteSize() uses some presumptions about OpndSize_ values
-     *              Ia32::Constraint-s use the OpndSize as a mask
-     *              encoder.cpp & encoder_master_info.cpp uses OpndSize as an index for hashing
-     *              - perhaps there are much more places
-     */
-    OpndSize_Null           = 0,
-    OpndSize_8             = 0x01,
-    OpndSize_16            = 0x02,
-    OpndSize_32            = 0x04,
-    OpndSize_64            = 0x08,
-#if !defined(TESTING_ENCODER)
-    OpndSize_80            = 0x10,
-    OpndSize_128           = 0x20,
-#endif
-    OpndSize_Max,
-    OpndSize_Any            = 0xFF,
-    OpndSize_Default        = OpndSize_Any
-};
-
-/** 
- * enum OpndRole defines the role of an operand in an instruction 
+/**
+ * enum OpndRole defines the role of an operand in an instruction
  * Can be used as mask to combine def and use. The complete def+use
  * info can be combined in 2 bits which is used, say in Encoder::OpndRole.
  */
 //TODO: this duplicates an Role used in the Ia32::Inst. That duplicate enum should be removed.
-enum OpndRole {
+typedef enum OpndRole {
     OpndRole_Null=0,
     OpndRole_Use=0x1,
     OpndRole_Def=0x2,
     OpndRole_UseDef=OpndRole_Use|OpndRole_Def,
     OpndRole_All=0xffff,
-};
+} OpndRole;
 
 
 #define REGNAME(k,s,i) ( ((k & OpndKind_Any)<<24) | ((s & OpndSize_Any)<<16) | (i&0xFF) )
@@ -162,16 +153,16 @@ enum OpndRole {
 // following table go in ascending order. That is R8 goes after
 // RDI. It is necessary for decoder when extending registers from RAX-RDI
 // to R8-R15 by simply adding 8 to the index on EM64T architecture
-enum RegName {
+typedef enum RegName {
 
-    RegName_Null = 0, 
+    RegName_Null = 0,
 
 #ifdef _EM64T_
     /*
-    An index part of the RegName-s for RAX-RDI, EAX-ESI, AX-SI and AL-BH is 
-    the same as the index used during instructions encoding. The same rule 
+    An index part of the RegName-s for RAX-RDI, EAX-ESI, AX-SI and AL-BH is
+    the same as the index used during instructions encoding. The same rule
     applies for XMM regsters for IA32.
-    For new EM64T registers (both GP and XMM) the index need to be corrected to 
+    For new EM64T registers (both GP and XMM) the index need to be corrected to
     obtain the index used in processor's instructions.
     */
     RegName_RAX = REGNAME(OpndKind_GPReg,OpndSize_64,0),
@@ -232,7 +223,7 @@ enum RegName {
     RegName_R14S = REGNAME(OpndKind_GPReg,OpndSize_16,14),
     RegName_R15S = REGNAME(OpndKind_GPReg,OpndSize_16,15),
 #endif //~_EM64T_
-    
+
     RegName_AL=REGNAME(OpndKind_GPReg,OpndSize_8,0),
     RegName_CL=REGNAME(OpndKind_GPReg,OpndSize_8,1),
     RegName_DL=REGNAME(OpndKind_GPReg,OpndSize_8,2),
@@ -241,7 +232,7 @@ enum RegName {
     // AH is not accessible on EM64T, instead encoded register is SPL, so decoded
     // register will return incorrect enum
     RegName_AH=REGNAME(OpndKind_GPReg,OpndSize_8,4),
-#if !defined(_EM64T_)    
+#if !defined(_EM64T_)
     RegName_CH=REGNAME(OpndKind_GPReg,OpndSize_8,5),
     RegName_DH=REGNAME(OpndKind_GPReg,OpndSize_8,6),
     RegName_BH=REGNAME(OpndKind_GPReg,OpndSize_8,7),
@@ -298,7 +289,7 @@ enum RegName {
     RegName_FP7D=REGNAME(OpndKind_FPReg,OpndSize_64,7),
 
 #if !defined(TESTING_ENCODER)
-    RegName_XMM0=REGNAME(OpndKind_XMMReg,OpndSize_128,0), 
+    RegName_XMM0=REGNAME(OpndKind_XMMReg,OpndSize_128,0),
     RegName_XMM1=REGNAME(OpndKind_XMMReg,OpndSize_128,1),
     RegName_XMM2=REGNAME(OpndKind_XMMReg,OpndSize_128,2),
     RegName_XMM3=REGNAME(OpndKind_XMMReg,OpndSize_128,3),
@@ -308,7 +299,7 @@ enum RegName {
     RegName_XMM7=REGNAME(OpndKind_XMMReg,OpndSize_128,7),
 
 #ifdef _EM64T_
-    RegName_XMM8  = REGNAME(OpndKind_XMMReg,OpndSize_128,0), 
+    RegName_XMM8  = REGNAME(OpndKind_XMMReg,OpndSize_128,0),
     RegName_XMM9  = REGNAME(OpndKind_XMMReg,OpndSize_128,1),
     RegName_XMM10 = REGNAME(OpndKind_XMMReg,OpndSize_128,2),
     RegName_XMM11 = REGNAME(OpndKind_XMMReg,OpndSize_128,3),
@@ -320,7 +311,7 @@ enum RegName {
 
 #endif  // ~TESTING_ENCODER
 
-    RegName_XMM0S=REGNAME(OpndKind_XMMReg,OpndSize_32,0), 
+    RegName_XMM0S=REGNAME(OpndKind_XMMReg,OpndSize_32,0),
     RegName_XMM1S=REGNAME(OpndKind_XMMReg,OpndSize_32,1),
     RegName_XMM2S=REGNAME(OpndKind_XMMReg,OpndSize_32,2),
     RegName_XMM3S=REGNAME(OpndKind_XMMReg,OpndSize_32,3),
@@ -329,7 +320,7 @@ enum RegName {
     RegName_XMM6S=REGNAME(OpndKind_XMMReg,OpndSize_32,6),
     RegName_XMM7S=REGNAME(OpndKind_XMMReg,OpndSize_32,7),
 #ifdef _EM64T_
-    RegName_XMM8S=REGNAME(OpndKind_XMMReg,OpndSize_32,8), 
+    RegName_XMM8S=REGNAME(OpndKind_XMMReg,OpndSize_32,8),
     RegName_XMM9S=REGNAME(OpndKind_XMMReg,OpndSize_32,9),
     RegName_XMM10S=REGNAME(OpndKind_XMMReg,OpndSize_32,10),
     RegName_XMM11S=REGNAME(OpndKind_XMMReg,OpndSize_32,11),
@@ -338,7 +329,7 @@ enum RegName {
     RegName_XMM14S=REGNAME(OpndKind_XMMReg,OpndSize_32,14),
     RegName_XMM15S=REGNAME(OpndKind_XMMReg,OpndSize_32,15),
 #endif // ifdef _EM64T_
-    RegName_XMM0D=REGNAME(OpndKind_XMMReg,OpndSize_64,0), 
+    RegName_XMM0D=REGNAME(OpndKind_XMMReg,OpndSize_64,0),
     RegName_XMM1D=REGNAME(OpndKind_XMMReg,OpndSize_64,1),
     RegName_XMM2D=REGNAME(OpndKind_XMMReg,OpndSize_64,2),
     RegName_XMM3D=REGNAME(OpndKind_XMMReg,OpndSize_64,3),
@@ -347,7 +338,7 @@ enum RegName {
     RegName_XMM6D=REGNAME(OpndKind_XMMReg,OpndSize_64,6),
     RegName_XMM7D=REGNAME(OpndKind_XMMReg,OpndSize_64,7),
 #ifdef _EM64T_
-    RegName_XMM8D=REGNAME(OpndKind_XMMReg,OpndSize_64,8), 
+    RegName_XMM8D=REGNAME(OpndKind_XMMReg,OpndSize_64,8),
     RegName_XMM9D=REGNAME(OpndKind_XMMReg,OpndSize_64,9),
     RegName_XMM10D=REGNAME(OpndKind_XMMReg,OpndSize_64,10),
     RegName_XMM11D=REGNAME(OpndKind_XMMReg,OpndSize_64,11),
@@ -366,11 +357,12 @@ enum RegName {
     RegName_MMX6=REGNAME(OpndKind_MMXReg,OpndSize_64,6),
     RegName_MMX7=REGNAME(OpndKind_MMXReg,OpndSize_64,7),
 #endif  // _HAVE_MMX_
-};
+} RegName;
 
+#if 0   // Android x86: use mnemonics defined in enc_defs_ext.h
 /**
  * Conditional mnemonics.
- * The values match the 'real' (==processor's) values of the appropriate 
+ * The values match the 'real' (==processor's) values of the appropriate
  * condition values used in the opcodes.
  */
 enum ConditionMnemonic {
@@ -472,17 +464,17 @@ Mnemonic_EMMS,                          // Empty MMX Technology State
 
 Mnemonic_ENTER,                         // ENTER-Make Stack Frame for Procedure Parameters
 Mnemonic_FLDCW,                         // Load FPU control word
-Mnemonic_FADDP,                        
-Mnemonic_FLDZ,                        
-Mnemonic_FADD,                        
-Mnemonic_FSUBP,                        
-Mnemonic_FSUB,                        
+Mnemonic_FADDP,
+Mnemonic_FLDZ,
+Mnemonic_FADD,
+Mnemonic_FSUBP,
+Mnemonic_FSUB,
 Mnemonic_FISUB,
-Mnemonic_FMUL,                        
-Mnemonic_FMULP,                        
-Mnemonic_FDIVP,                        
-Mnemonic_FDIV,                        
-Mnemonic_FUCOMPP,                        
+Mnemonic_FMUL,
+Mnemonic_FMULP,
+Mnemonic_FDIVP,
+Mnemonic_FDIV,
+Mnemonic_FUCOMPP,
 Mnemonic_FRNDINT,
 Mnemonic_FNSTCW,                        // Store FPU control word
 Mnemonic_FSTSW,                         // Store FPU status word
@@ -547,7 +539,7 @@ Mnemonic_LEA,                           // Load Effective Address
 Mnemonic_LEAVE,                         // High Level Procedure Exit
 Mnemonic_LOOP,                          // Loop according to ECX counter
 Mnemonic_LOOPE,                          // Loop according to ECX counter
-Mnemonic_LOOPNE, Mnemonic_LOOPNZ = Mnemonic_LOOPNE, // Loop according to ECX 
+Mnemonic_LOOPNE, Mnemonic_LOOPNZ = Mnemonic_LOOPNE, // Loop according to ECX
 Mnemonic_LAHF,                          // Load Flags into AH
 Mnemonic_MOV,                           // Move
 Mnemonic_MOVD,                          // Move Double word
@@ -649,12 +641,13 @@ Mnemonic_Count
 };
 
 #undef CCM
+#endif
 
 /**
  * @brief Instruction prefixes, according to arch manual.
  */
-enum InstPrefix {
-    InstPrefix_Null = 0, 
+typedef enum InstPrefix {
+    InstPrefix_Null = 0,
     // Group 1
     InstPrefix_LOCK = 0xF0,
     InstPrefix_REPNE = 0xF2,
@@ -674,7 +667,7 @@ enum InstPrefix {
     InstPrefix_OpndSize = 0x66,
     // Group 4
     InstPrefix_AddrSize = 0x67
-};
+} InstPrefix;
 
 inline unsigned getSizeBytes(OpndSize sz)
 {
@@ -686,14 +679,14 @@ inline unsigned getSizeBytes(OpndSize sz)
     return 0;
 }
 
-inline bool isRegKind(OpndKind kind) 
+inline bool isRegKind(OpndKind kind)
 {
     return OpndKind_GPReg<= kind && kind<=OpndKind_MaxRegKind;
 }
 
 /**
  * @brief Returns #RegName for a given name.
- * 
+ *
  * Name is case-insensitive.
  * @param regname - string name of a register
  * @return #RegName for the given name, or #RegName_Null if name is invalid
@@ -767,7 +760,7 @@ OpndKind        getOpndKind(const char * kindString);
 const char *    getConditionString(ConditionMnemonic cm);
 
 /**
- * Constructs an RegName with the same index and kind, but with a different size from 
+ * Constructs an RegName with the same index and kind, but with a different size from
  * the given RegName (i.e. getRegAlias(EAX, OpndSize_16) => AX; getRegAlias(BL, OpndSize_32) => EBX).
  * The constructed RegName is not checked in any way and thus may be invalid.
  * Note, that the aliasing does not work for at least AH,BH,CH,DH, ESI, EDI, ESP and EBP regs.
@@ -784,7 +777,7 @@ inline RegName getAliasReg(RegName reg, OpndSize sz)
  */
 inline bool equals(RegName r0, RegName r1)
 {
-    return getRegKind(r0) == getRegKind(r1) && 
+    return getRegKind(r0) == getRegKind(r1) &&
            getRegIndex(r0) == getRegIndex(r1);
 }
 
