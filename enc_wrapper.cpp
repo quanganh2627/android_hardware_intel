@@ -82,23 +82,31 @@ inline void add_imm(EncoderBase::Operands & args, OpndSize sz, int value, bool i
 }
 #define PRINT_ENCODER_STREAM
 #ifdef PRINT_ENCODER_STREAM
-char tmpBuffer[1024];
+#define MAX_DECODED_STRING_LEN 1024
+char tmpBuffer[MAX_DECODED_STRING_LEN];
+char tmpBuffer2[MAX_DECODED_STRING_LEN];
 void printOperand(const EncoderBase::Operand & opnd) {
     if(!dump_x86_inst) return;
-    if(opnd.size() != OpndSize_32)
-      sprintf(tmpBuffer, "%s%s ", tmpBuffer, getOpndSizeString(opnd.size()));
+    if(opnd.size() != OpndSize_32) {
+        sprintf(tmpBuffer2, "%s ", getOpndSizeString(opnd.size()));
+        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+    }
     if(opnd.is_mem()) {
-      if(opnd.scale() != 0) {
-        sprintf(tmpBuffer, "%s%d(%s,%s,%d)", tmpBuffer, opnd.disp(), getRegNameString(opnd.base()), getRegNameString(opnd.index()), opnd.scale());
-      } else {
-        sprintf(tmpBuffer, "%s%d(%s)", tmpBuffer, opnd.disp(), getRegNameString(opnd.base()));
-      }
+        if(opnd.scale() != 0) {
+            sprintf(tmpBuffer2, "%d(%s,%s,%d)", opnd.disp(), getRegNameString(opnd.base()), getRegNameString(opnd.index()), opnd.scale());
+            strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+        } else {
+            sprintf(tmpBuffer2, "%d(%s)", opnd.disp(), getRegNameString(opnd.base()));
+            strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+        }
     }
     if(opnd.is_imm()) {
-      sprintf(tmpBuffer, "%s#%x", tmpBuffer, (int)opnd.imm());
+        sprintf(tmpBuffer2, "#%x", (int)opnd.imm());
+        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
     }
     if(opnd.is_reg()) {
-      sprintf(tmpBuffer, "%s%s", tmpBuffer, getRegNameString(opnd.reg()));
+        sprintf(tmpBuffer2, "%s", getRegNameString(opnd.reg()));
+        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
     }
 }
 //TODO: the order of operands
@@ -106,20 +114,23 @@ void printOperand(const EncoderBase::Operand & opnd) {
 //I reverse the order here
 void printDecoderInst(Inst & decInst) {
     if(!dump_x86_inst) return;
-    sprintf(tmpBuffer, "%s%s ", tmpBuffer, EncoderBase::toStr(decInst.mn));
+    sprintf(tmpBuffer2, "%s ", EncoderBase::toStr(decInst.mn));
+    strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
     for(unsigned int k = 0; k < decInst.argc; k++) {
-      if(k > 0)
-        sprintf(tmpBuffer, "%s, ", tmpBuffer);
-      printOperand(decInst.operands[decInst.argc-1-k]);
+        if(k > 0) {
+            strncat(tmpBuffer, ", ", MAX_DECODED_STRING_LEN-3);
+        }
+        printOperand(decInst.operands[decInst.argc-1-k]);
     }
     printf("%s\n", tmpBuffer);
 }
 void printOperands(EncoderBase::Operands& opnds) {
     if(!dump_x86_inst) return;
     for(unsigned int k = 0; k < opnds.count(); k++) {
-      if(k > 0)
-        sprintf(tmpBuffer, "%s, ", tmpBuffer);
-      printOperand(opnds[opnds.count()-1-k]);
+        if(k > 0) {
+            strncat(tmpBuffer, ", ", MAX_DECODED_STRING_LEN-3);
+        }
+        printOperand(opnds[opnds.count()-1-k]);
     }
 }
 void printEncoderInst(Mnemonic m, EncoderBase::Operands& opnds) {
