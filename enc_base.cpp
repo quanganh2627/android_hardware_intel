@@ -51,6 +51,9 @@ const unsigned char EncoderBase::size_hash[OpndSize_64+1] = {
     2,              // OpndSize_16          = 0x2,
     0xFF,   // 0x3
     1,              // OpndSize_32          = 0x4,
+    0xFF,   // 0x5
+    0xFF,   // 0x6
+    0xFF,   // 0x7
     0,              // OpndSize_64          = 0x8,
     //
 };

@@ -282,7 +282,7 @@ unsigned short EncoderBase::getHash(const OpcodeInfo* odesc)
         OpndSize size = odesc->opnds[0].size;
         assert(kind<COUNTOF(kind_hash));
         assert(size<COUNTOF(size_hash));
-        hash = kind_hash[kind] | size_hash[size];
+        hash = get_kind_hash(kind) | get_size_hash(size);
     }
 
     if (odesc->roles.count > 1) {
@@ -291,7 +291,7 @@ unsigned short EncoderBase::getHash(const OpcodeInfo* odesc)
         assert(kind<COUNTOF(kind_hash));
         assert(size<COUNTOF(size_hash));
         hash = (hash<<HASH_BITS_PER_OPERAND) |
-               (kind_hash[kind] | size_hash[size]);
+               (get_kind_hash(kind) | get_size_hash(size));
     }
 
     if (odesc->roles.count > 2) {
@@ -300,7 +300,7 @@ unsigned short EncoderBase::getHash(const OpcodeInfo* odesc)
         assert(kind<COUNTOF(kind_hash));
         assert(size<COUNTOF(size_hash));
         hash = (hash<<HASH_BITS_PER_OPERAND) |
-               (kind_hash[kind] | size_hash[size]);
+            (get_kind_hash(kind) | get_size_hash(size));
     }
     assert(hash <= HASH_MAX);
     return hash;

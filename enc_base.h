@@ -493,7 +493,7 @@ public:
         }
         void hash_it(void)
         {
-            m_hash = size_hash[m_size] | kind_hash[m_kind];
+            m_hash = get_size_hash(m_size) | get_kind_hash(m_kind);
 #ifdef _EM64T_
             m_need_rex = false;
             if (is_reg() && is_em64t_extra_reg(m_reg)) {
@@ -680,6 +680,13 @@ private:
     }
 #endif
 public:
+    static unsigned char get_size_hash(OpndSize size) {
+        return (size <= OpndSize_64) ? size_hash[size] : 0xFF;
+    }
+    static unsigned char get_kind_hash(OpndKind kind) {
+        return (kind <= OpndKind_Mem) ? kind_hash[kind] : 0xFF;
+    }
+
     /**
      * @brief A table used for the fast computation of hash value.
      *
