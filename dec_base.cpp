@@ -474,7 +474,9 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
 
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
-        RegName reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
+        // Android x86: Use XMMReg for 64b operand.
+        OpndKind okind = (opndDesc.size == OpndSize_64) ? OpndKind_XMMReg : OpndKind_GPReg;
+        RegName reg = getRegName(okind, opndDesc.size, EXTEND_REG(modrm.rm, b));
         opnd = EncoderBase::Operand(reg);
         return true;
     }
@@ -485,7 +487,8 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     if (modrm.rm == 4) {
         // yes, we have SIB
         *pbuf += 1;
-        scale = sib.scale == 0 ? 0 : (1<<sib.scale);
+        // scale = sib.scale == 0 ? 0 : (1<<sib.scale);
+        scale = (1<<sib.scale);
         if (sib.index != 4) {
             index = getRegName(OpndKind_GPReg, OpndSize_32, EXTEND_REG(sib.index, x)); //Android x86: OpndDesc.size
         } else {
