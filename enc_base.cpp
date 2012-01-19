@@ -454,7 +454,7 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
 {
     const Operand& op = opnds[idx];
     assert(op.is_mem());
-
+    assert(idx < COUNTOF(curRelOpnd));
     ModRM& modrm = *(ModRM*)stream;
     ++stream;
     SIB& sib = *(SIB*)stream;
