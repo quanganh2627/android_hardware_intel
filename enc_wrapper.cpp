@@ -84,64 +84,75 @@ inline void add_imm(EncoderBase::Operands & args, OpndSize sz, int value, bool i
 #ifdef PRINT_ENCODER_STREAM
 #define MAX_DECODED_STRING_LEN 1024
 char tmpBuffer[MAX_DECODED_STRING_LEN];
-char tmpBuffer2[MAX_DECODED_STRING_LEN];
+
 void printOperand(const EncoderBase::Operand & opnd) {
+    unsigned int sz;
     if(!dump_x86_inst) return;
+    sz = strlen(tmpBuffer);
     if(opnd.size() != OpndSize_32) {
-        sprintf(tmpBuffer2, "%s ", getOpndSizeString(opnd.size()));
-        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+        sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, "%s ",
+                       getOpndSizeString(opnd.size()));
     }
     if(opnd.is_mem()) {
         if(opnd.scale() != 0) {
-            sprintf(tmpBuffer2, "%d(%s,%s,%d)", opnd.disp(), getRegNameString(opnd.base()), getRegNameString(opnd.index()), opnd.scale());
-            strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+            sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz,
+                           "%d(%s,%s,%d)", opnd.disp(),
+                           getRegNameString(opnd.base()),
+                           getRegNameString(opnd.index()), opnd.scale());
         } else {
-            sprintf(tmpBuffer2, "%d(%s)", opnd.disp(), getRegNameString(opnd.base()));
-            strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+            sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, "%d(%s)",
+                           opnd.disp(), getRegNameString(opnd.base()));
         }
     }
     if(opnd.is_imm()) {
-        sprintf(tmpBuffer2, "#%x", (int)opnd.imm());
-        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+        sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, "#%x",
+                       (int)opnd.imm());
     }
     if(opnd.is_reg()) {
-        sprintf(tmpBuffer2, "%s", getRegNameString(opnd.reg()));
-        strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+        sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, "%s",
+                       getRegNameString(opnd.reg()));
     }
 }
 //TODO: the order of operands
 //to make the printout have the same order as assembly in .S
 //I reverse the order here
 void printDecoderInst(Inst & decInst) {
+    unsigned int sz;
     if(!dump_x86_inst) return;
-    sprintf(tmpBuffer2, "%s ", EncoderBase::toStr(decInst.mn));
-    strncat(tmpBuffer, tmpBuffer2, MAX_DECODED_STRING_LEN-strlen(tmpBuffer)-1);
+    sz = strlen(tmpBuffer);
+    sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, "%s ",
+                   EncoderBase::toStr(decInst.mn));
     for(unsigned int k = 0; k < decInst.argc; k++) {
         if(k > 0) {
-            strncat(tmpBuffer, ", ", MAX_DECODED_STRING_LEN-3);
+            sz = strlen(tmpBuffer);
+            sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, ", ");
         }
         printOperand(decInst.operands[decInst.argc-1-k]);
     }
     printf("%s\n", tmpBuffer);
 }
 void printOperands(EncoderBase::Operands& opnds) {
+    unsigned int sz;
     if(!dump_x86_inst) return;
     for(unsigned int k = 0; k < opnds.count(); k++) {
         if(k > 0) {
-            strncat(tmpBuffer, ", ", MAX_DECODED_STRING_LEN-3);
+            sz = strlen(tmpBuffer);
+            sz += snprintf(&tmpBuffer[sz], MAX_DECODED_STRING_LEN-sz, ", ");
         }
         printOperand(opnds[opnds.count()-1-k]);
     }
 }
 void printEncoderInst(Mnemonic m, EncoderBase::Operands& opnds) {
     if(!dump_x86_inst) return;
-    sprintf(tmpBuffer, "--- ENC %s ", EncoderBase::toStr(m));
+    snprintf(tmpBuffer, MAX_DECODED_STRING_LEN, "--- ENC %s ",
+             EncoderBase::toStr(m));
     printOperands(opnds);
     printf("%s\n", tmpBuffer);
 }
 int decodeThenPrint(char* stream_start) {
     if(!dump_x86_inst) return 0;
-    sprintf(tmpBuffer, "--- INST @ %p: ", stream_start);
+    snprintf(tmpBuffer, MAX_DECODED_STRING_LEN, "--- INST @ %p: ",
+             stream_start);
     Inst decInst;
     unsigned numBytes = DecoderBase::decode(stream_start, &decInst);
     unsigned i;
