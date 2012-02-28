@@ -107,6 +107,10 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
     OpcodeByteKind kind = (OpcodeByteKind)(byte & OpcodeByteKind_KindMask);
     // The '>>' here is to force the switch to be table-based) instead of
     // set of CMP+Jcc.
+    if (*pargsCount >= COUNTOF(opnds)) {
+        assert(false);
+        return stream;
+    }
     switch(kind>>8) {
     case OpcodeByteKind_SlashR>>8:
         // /r - Indicates that the ModR/M byte of the instruction contains
@@ -121,6 +125,10 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
         memidx += *pargsCount;
         regidx += *pargsCount;
         ModRM& modrm = *(ModRM*)stream;
+        if (memidx >= COUNTOF(opnds)) {
+            assert(false);
+            break;
+        }
         if (opnds[memidx].is_mem()) {
             stream = encodeModRM(stream, opnds, memidx, odesc, prex);
         }
