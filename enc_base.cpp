@@ -125,7 +125,7 @@ char* EncoderBase::encode_aux(char* stream, unsigned aux,
         memidx += *pargsCount;
         regidx += *pargsCount;
         ModRM& modrm = *(ModRM*)stream;
-        if (memidx >= COUNTOF(opnds)) {
+        if (memidx >= COUNTOF(opnds) || regidx >= COUNTOF(opnds)) {
             assert(false);
             break;
         }
