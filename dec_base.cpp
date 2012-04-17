@@ -202,36 +202,35 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
 
     switch (kind) {
     case OpcodeByteKind_SlashR:
-        //decodeModRM(odesc, pbuf, pinst);
         {
-        const ModRM& modrm = *(ModRM*)*pbuf;
-        unsigned regIndex = odesc.opnds[0].kind == OpndKind_GPReg ? 0 : 1;
-        RegName reg;
-        // Android x86: handle 64-bit registers
-        if(opndDesc.size == OpndSize_64)
-          reg = getRegName(OpndKind_XMMReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
-        else
-          reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
-        EncoderBase::Operand& regOpnd = pinst->operands[regIndex];
-        if (regIndex == 0) {
-            regOpnd = EncoderBase::Operand(reg);
-            ++pinst->argc;
-            decodeModRM(odesc, pbuf, pinst
+            RegName reg;
+            OpndKind okind;
+            const ModRM& modrm = *(ModRM*)*pbuf;
+            if (opndDesc.kind & OpndKind_Mem) { // 1st operand is memory
 #ifdef _EM64T_
-                        , rex
+                decodeModRM(odesc, pbuf, pinst, rex);
+#else
+                decodeModRM(odesc, pbuf, pinst);
 #endif
-                        );
-        }
-        else {
-            decodeModRM(odesc, pbuf, pinst
+                ++pinst->argc;
+                const EncoderBase::OpndDesc& opndDesc2 = odesc.opnds[pinst->argc];
+                okind = ((opndDesc2.kind & OpndKind_XMMReg) || opndDesc2.size==OpndSize_64) ? OpndKind_XMMReg : OpndKind_GPReg;
+                EncoderBase::Operand& regOpnd = pinst->operands[pinst->argc];
+                reg = getRegName(okind, opndDesc2.size, EXTEND_REG(modrm.reg, r));
+                regOpnd = EncoderBase::Operand(reg);
+            } else {                            // 2nd operand is memory
+                okind = ((opndDesc.kind & OpndKind_XMMReg) || opndDesc.size==OpndSize_64) ? OpndKind_XMMReg : OpndKind_GPReg;
+                EncoderBase::Operand& regOpnd = pinst->operands[pinst->argc];
+                reg = getRegName(okind, opndDesc.size, EXTEND_REG(modrm.reg, r));
+                regOpnd = EncoderBase::Operand(reg);
+                ++pinst->argc;
 #ifdef _EM64T_
-                        , rex
+                decodeModRM(odesc, pbuf, pinst, rex);
+#else
+                decodeModRM(odesc, pbuf, pinst);
 #endif
-                        );
+            }
             ++pinst->argc;
-            regOpnd = EncoderBase::Operand(reg);
-        }
-        ++pinst->argc;
         }
         return true;
     case OpcodeByteKind_rb:
@@ -475,7 +474,7 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
         // Android x86: Use XMMReg for 64b operand.
-        OpndKind okind = (opndDesc.size == OpndSize_64) ? OpndKind_XMMReg : OpndKind_GPReg;
+        OpndKind okind = ((opndDesc.kind & OpndKind_XMMReg) || opndDesc.size == OpndSize_64) ? OpndKind_XMMReg : OpndKind_GPReg;
         RegName reg = getRegName(okind, opndDesc.size, EXTEND_REG(modrm.rm, b));
         opnd = EncoderBase::Operand(reg);
         return true;
