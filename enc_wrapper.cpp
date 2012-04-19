@@ -22,6 +22,7 @@
 #include "dec_base.h"
 #include "utils/Log.h"
 
+//#define PRINT_ENCODER_STREAM
 bool dump_x86_inst = false;
 #ifdef _ZYGOTE_NCG_DEBUG_
 #define printf LOGE
@@ -80,8 +81,7 @@ inline void add_imm(EncoderBase::Operands & args, OpndSize sz, int value, bool i
     args.add(EncoderBase::Operand(sz, value,
              is_signed ? OpndExt_Signed : OpndExt_Zero));
 }
-#define PRINT_ENCODER_STREAM
-#ifdef PRINT_ENCODER_STREAM
+
 #define MAX_DECODED_STRING_LEN 1024
 char tmpBuffer[MAX_DECODED_STRING_LEN];
 
@@ -159,7 +159,6 @@ int decodeThenPrint(char* stream_start) {
     printDecoderInst(decInst);
     return numBytes;
 }
-#endif
 
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_imm(Mnemonic m, OpndSize size, int imm, char * stream) {
     EncoderBase::Operands args;
@@ -504,4 +503,60 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_moves_reg_to_reg(OpndSize size,
     decodeThenPrint(stream_start);
 #endif
     return stream;
+}
+
+// Disassemble the operand "opnd" and put the readable format in "strbuf"
+// up to a string length of "len".
+unsigned int DisassembleOperandToBuf(const EncoderBase::Operand& opnd, char* strbuf, unsigned int len)
+{
+    unsigned int sz = 0;
+    if(opnd.size() != OpndSize_32) {
+        sz += snprintf(&strbuf[sz], len-sz, "%s ",
+                       getOpndSizeString(opnd.size()));
+    }
+    if(opnd.is_mem()) {
+        if(opnd.scale() != 0) {
+            sz += snprintf(&strbuf[sz], len-sz, "%d(%s,%s,%d)", opnd.disp(),
+                           getRegNameString(opnd.base()),
+                           getRegNameString(opnd.index()), opnd.scale());
+        } else {
+            sz += snprintf(&strbuf[sz], len-sz, "%d(%s)",
+                           opnd.disp(), getRegNameString(opnd.base()));
+        }
+    } else if(opnd.is_imm()) {
+        sz += snprintf(&strbuf[sz], len-sz, "#%x", (int)opnd.imm());
+    } else if(opnd.is_reg()) {
+        sz += snprintf(&strbuf[sz], len-sz, "%s",
+                       getRegNameString(opnd.reg()));
+    }
+    return sz;
+}
+
+// Disassemble the instruction "decInst" and put the readable format
+// in "strbuf" up to a string length of "len".
+void DisassembleInstToBuf(Inst& decInst, char* strbuf, unsigned int len)
+{
+    unsigned int sz = 0;
+    int k;
+    sz += snprintf(&strbuf[sz], len-sz, "%s ", EncoderBase::toStr(decInst.mn));
+    if (decInst.argc > 0) {
+        sz += DisassembleOperandToBuf(decInst.operands[decInst.argc-1],
+                                 &strbuf[sz], len-sz);
+        for(k = decInst.argc-2; k >= 0; k--) {
+            sz += snprintf(&strbuf[sz], len-sz, ", ");
+            sz += DisassembleOperandToBuf(decInst.operands[k], &strbuf[sz], len-sz);
+        }
+    }
+}
+
+// Disassmble the x86 instruction pointed to by code pointer "stream."
+// Put the disassemble text in the "strbuf" up to string length "len".
+// Return the code pointer after the disassemble x86 instruction.
+extern "C" ENCODER_DECLARE_EXPORT
+char* decoder_disassemble_instr(char* stream, char* strbuf, unsigned int len)
+{
+    Inst decInst;
+    unsigned numBytes = DecoderBase::decode(stream, &decInst);
+    DisassembleInstToBuf(decInst, strbuf, len);
+    return (stream + numBytes);
 }

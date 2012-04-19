@@ -237,6 +237,7 @@ ENCODER_DECLARE_EXPORT char * encoder_moves_reg_to_reg(OpndSize size,
                       int reg, bool isPhysical, int reg2,
                       bool isPhysical2, LowOpndRegType type, char * stream);
 ENCODER_DECLARE_EXPORT int decodeThenPrint(char* stream_start);
+ENCODER_DECLARE_EXPORT char* decoder_disassemble_instr(char* stream, char* strbuf, unsigned int len);
 #ifdef __cplusplus
 }
 #endif
