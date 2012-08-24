@@ -243,12 +243,13 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_reg(Mnemonic m, OpndSize si
 #endif
     return stream;
 }
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_reg(Mnemonic m, OpndSize size,
-                   int disp, int base_reg, bool isBasePhysical,
+//! \brief Allows for different operand sizes
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_to_reg_2(Mnemonic m, OpndSize memOpndSize,
+                   int disp, int base_reg, bool isBasePhysical, OpndSize regOpndSize,
                    int reg, bool isPhysical, LowOpndRegType type, char * stream) {
     EncoderBase::Operands args;
-    add_r(args, reg, size);
-    add_m(args, base_reg, disp, size);
+    add_r(args, reg, regOpndSize);
+    add_m(args, base_reg, disp, memOpndSize);
     char* stream_start = stream;
     stream = (char *)EncoderBase::encode(stream, m, args);
 #ifdef PRINT_ENCODER_STREAM
@@ -256,6 +257,11 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_reg(Mnemonic m, OpndSize si
     decodeThenPrint(stream_start);
 #endif
     return stream;
+}
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_reg(Mnemonic m, OpndSize size,
+                   int disp, int base_reg, bool isBasePhysical,
+                   int reg, bool isPhysical, LowOpndRegType type, char * stream) {
+    return encoder_mem_to_reg_2(m, size, disp, base_reg, isBasePhysical, size, reg, isPhysical, type, stream);
 }
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int index_reg, bool isIndexPhysical, int scale,
@@ -286,12 +292,13 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_mem_scale(Mnemonic m, OpndS
 #endif
     return stream;
 }
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, OpndSize size,
+//! \brief Allows for different operand sizes
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_2(Mnemonic m, OpndSize memOpndSize,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
-                         int reg, bool isPhysical, LowOpndRegType type, char * stream) {
+                         OpndSize regOpndSize, int reg, bool isPhysical, LowOpndRegType type, char * stream) {
     EncoderBase::Operands args;
-    add_r(args, reg, size);
-    add_m_disp_scale(args, base_reg, disp, index_reg, scale, size);
+    add_r(args, reg, regOpndSize);
+    add_m_disp_scale(args, base_reg, disp, index_reg, scale, memOpndSize);
     char* stream_start = stream;
     stream = (char *)EncoderBase::encode(stream, m, args);
 #ifdef PRINT_ENCODER_STREAM
@@ -299,6 +306,13 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, 
     decodeThenPrint(stream_start);
 #endif
     return stream;
+}
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, OpndSize size,
+                         int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
+                         int reg, bool isPhysical, LowOpndRegType type, char * stream) {
+    return encoder_mem_disp_scale_to_reg_2(m, size, base_reg, isBasePhysical,
+            disp, index_reg, isIndexPhysical, scale, size, reg, isPhysical,
+            type, stream);
 }
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_movzs_mem_disp_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,

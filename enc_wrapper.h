@@ -191,6 +191,9 @@ ENCODER_DECLARE_EXPORT char* encoder_reg_reg(Mnemonic m, OpndSize size,
 ENCODER_DECLARE_EXPORT char* encoder_mem_reg(Mnemonic m, OpndSize size,
                    int disp, int base_reg, bool isBasePhysical,
                    int reg, bool isPhysical, LowOpndRegType type, char* stream);
+ENCODER_DECLARE_EXPORT char* encoder_mem_to_reg_2(Mnemonic m, OpndSize memOpndSize,
+                   int disp, int base_reg, bool isBasePhysical, OpndSize regOpndSize,
+                   int reg, bool isPhysical, LowOpndRegType type, char* stream);
 ENCODER_DECLARE_EXPORT char* encoder_mem_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int index_reg, bool isIndexPhysical, int scale,
                          int reg, bool isPhysical, LowOpndRegType type, char* stream);
@@ -201,6 +204,9 @@ ENCODER_DECLARE_EXPORT char* encoder_reg_mem_scale(Mnemonic m, OpndSize size,
 ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          int reg, bool isPhysical, LowOpndRegType type, char * stream);
+ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_2(Mnemonic m, OpndSize memOpndSize,
+                         int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
+                         OpndSize regOpndSize, int reg, bool isPhysical, LowOpndRegType type, char * stream);
 ENCODER_DECLARE_EXPORT char * encoder_movzs_mem_disp_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          int reg, bool isPhysical, LowOpndRegType type, char * stream);
