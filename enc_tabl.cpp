@@ -984,7 +984,12 @@ END_MNEMONIC()
 
 BEGIN_MNEMONIC(DIV, MF_AFFECTS_FLAGS, DU_DU_U)
 BEGIN_OPCODES()
+#if !defined(_EM64T_)
+    {OpcodeInfo::all,   {0xF6, _6},         {AH, AL, r_m8},     DU_DU_U },
+    {OpcodeInfo::all,   {Size16, 0xF7, _6}, {DX, AX, r_m16},    DU_DU_U },
+#endif
     {OpcodeInfo::all,   {0xF7, _6},         {EDX, EAX, r_m32},  DU_DU_U },
+    {OpcodeInfo::em64t, {REX_W, 0xF7, _6},  {RDX, RAX, r_m64},  DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
