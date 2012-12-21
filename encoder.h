@@ -504,7 +504,6 @@ ENCODER_DECLARE_EXPORT char * imul(char * stream, const R_Opnd & r, const RM_Opn
 
 // divide instructions: div, idiv
 ENCODER_DECLARE_EXPORT char * idiv(char * stream, const RM_Opnd & rm, Opnd_Size sz = size_platf);
-ENCODER_DECLARE_EXPORT char * div(char * stream, const RM_Opnd & rm, Opnd_Size sz = size_platf);
 
 // data movement: mov
 ENCODER_DECLARE_EXPORT char * mov(char * stream, const M_Opnd & m,  const R_Opnd & r, Opnd_Size sz = size_platf);

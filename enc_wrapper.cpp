@@ -211,7 +211,7 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem(Mnemonic m, OpndSize size,
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg(Mnemonic m, OpndSize size,
                int reg, bool isPhysical, LowOpndRegType type, char * stream) {
     EncoderBase::Operands args;
-    if(m == Mnemonic_DIV || m == Mnemonic_IDIV || m == Mnemonic_MUL || m == Mnemonic_IMUL) {
+    if(m == Mnemonic_IDIV || m == Mnemonic_MUL || m == Mnemonic_IMUL) {
       add_r(args, 0/*eax*/, size);
       add_r(args, 3/*edx*/, size);
     }
