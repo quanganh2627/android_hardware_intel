@@ -224,17 +224,17 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg(Mnemonic m, OpndSize size,
 #endif
     return stream;
 }
-//! \brief Allows for different operand sizes
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_reg_diff_sizes(Mnemonic m, OpndSize srcOpndSize,
-                   int reg, bool isPhysical, OpndSize destOpndSize,
+//both operands have same size
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_reg(Mnemonic m, OpndSize size,
+                   int reg, bool isPhysical,
                    int reg2, bool isPhysical2, LowOpndRegType type, char * stream) {
     if((m == Mnemonic_MOV || m == Mnemonic_MOVQ) && reg == reg2) return stream;
     EncoderBase::Operands args;
-    add_r(args, reg2, destOpndSize); //destination
+    add_r(args, reg2, size); //destination
     if(m == Mnemonic_SAL || m == Mnemonic_SHR || m == Mnemonic_SHL || m == Mnemonic_SAR)
       add_r(args, reg, OpndSize_8);
     else
-      add_r(args, reg, srcOpndSize);
+      add_r(args, reg, size);
     char* stream_start = stream;
     stream = (char *)EncoderBase::encode(stream, m, args);
 #ifdef PRINT_ENCODER_STREAM
@@ -243,14 +243,8 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_reg_diff_sizes(Mnemonic m, 
 #endif
     return stream;
 }
-//both operands have same size
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_reg(Mnemonic m, OpndSize size,
-                   int reg, bool isPhysical,
-                   int reg2, bool isPhysical2, LowOpndRegType type, char * stream) {
-    return encoder_reg_reg_diff_sizes(m, size, reg, isPhysical, size, reg2, isPhysical2, type, stream);
-}
 //! \brief Allows for different operand sizes
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_to_reg_diff_sizes(Mnemonic m, OpndSize memOpndSize,
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_to_reg_2(Mnemonic m, OpndSize memOpndSize,
                    int disp, int base_reg, bool isBasePhysical, OpndSize regOpndSize,
                    int reg, bool isPhysical, LowOpndRegType type, char * stream) {
     EncoderBase::Operands args;
@@ -267,7 +261,7 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_to_reg_diff_sizes(Mnemonic 
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_reg(Mnemonic m, OpndSize size,
                    int disp, int base_reg, bool isBasePhysical,
                    int reg, bool isPhysical, LowOpndRegType type, char * stream) {
-    return encoder_mem_to_reg_diff_sizes(m, size, disp, base_reg, isBasePhysical, size, reg, isPhysical, type, stream);
+    return encoder_mem_to_reg_2(m, size, disp, base_reg, isBasePhysical, size, reg, isPhysical, type, stream);
 }
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int index_reg, bool isIndexPhysical, int scale,
@@ -299,7 +293,7 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_reg_mem_scale(Mnemonic m, OpndS
     return stream;
 }
 //! \brief Allows for different operand sizes
-extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_diff_sizes(Mnemonic m, OpndSize memOpndSize,
+extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_2(Mnemonic m, OpndSize memOpndSize,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          OpndSize regOpndSize, int reg, bool isPhysical, LowOpndRegType type, char * stream) {
     EncoderBase::Operands args;
@@ -316,7 +310,7 @@ extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_diff_size
 extern "C" ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          int reg, bool isPhysical, LowOpndRegType type, char * stream) {
-    return encoder_mem_disp_scale_to_reg_diff_sizes(m, size, base_reg, isBasePhysical,
+    return encoder_mem_disp_scale_to_reg_2(m, size, base_reg, isBasePhysical,
             disp, index_reg, isIndexPhysical, scale, size, reg, isPhysical,
             type, stream);
 }
