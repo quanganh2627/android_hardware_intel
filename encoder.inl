@@ -301,6 +301,19 @@ ENCODER_DECLARE_EXPORT char * idiv(char * stream, const RM_Opnd & rm, Opnd_Size 
     return (char*)EncoderBase::encode(stream, Mnemonic_IDIV, args);
 }
 
+ENCODER_DECLARE_EXPORT char * div(char * stream, const RM_Opnd & rm, Opnd_Size sz) {
+    EncoderBase::Operands args;
+#ifdef _EM64T_
+    add_r(args, rdx_opnd, sz);
+    add_r(args, rax_opnd, sz);
+#else
+    add_r(args, edx_opnd, sz);
+    add_r(args, eax_opnd, sz);
+#endif
+    add_rm(args, rm, sz);
+    return (char*)EncoderBase::encode(stream, Mnemonic_DIV, args);
+}
+
 // data movement: mov
 ENCODER_DECLARE_EXPORT char * mov(char * stream, const M_Opnd & m, const R_Opnd & r, Opnd_Size sz) {
     EncoderBase::Operands args;
