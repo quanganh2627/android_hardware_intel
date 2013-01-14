@@ -188,10 +188,13 @@ ENCODER_DECLARE_EXPORT char* encoder_reg(Mnemonic m, OpndSize size,
 ENCODER_DECLARE_EXPORT char* encoder_reg_reg(Mnemonic m, OpndSize size,
                    int reg, bool isPhysical,
                    int reg2, bool isPhysical2, LowOpndRegType type, char* stream);
+ENCODER_DECLARE_EXPORT char* encoder_reg_reg_diff_sizes(Mnemonic m, OpndSize srcOpndSize,
+                   int reg, bool isPhysical, OpndSize destOpndSize,
+                   int reg2, bool isPhysical2, LowOpndRegType type, char* stream);
 ENCODER_DECLARE_EXPORT char* encoder_mem_reg(Mnemonic m, OpndSize size,
                    int disp, int base_reg, bool isBasePhysical,
                    int reg, bool isPhysical, LowOpndRegType type, char* stream);
-ENCODER_DECLARE_EXPORT char* encoder_mem_to_reg_2(Mnemonic m, OpndSize memOpndSize,
+ENCODER_DECLARE_EXPORT char* encoder_mem_to_reg_diff_sizes(Mnemonic m, OpndSize memOpndSize,
                    int disp, int base_reg, bool isBasePhysical, OpndSize regOpndSize,
                    int reg, bool isPhysical, LowOpndRegType type, char* stream);
 ENCODER_DECLARE_EXPORT char* encoder_mem_scale_reg(Mnemonic m, OpndSize size,
@@ -204,7 +207,7 @@ ENCODER_DECLARE_EXPORT char* encoder_reg_mem_scale(Mnemonic m, OpndSize size,
 ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_reg(Mnemonic m, OpndSize size,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          int reg, bool isPhysical, LowOpndRegType type, char * stream);
-ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_2(Mnemonic m, OpndSize memOpndSize,
+ENCODER_DECLARE_EXPORT char * encoder_mem_disp_scale_to_reg_diff_sizes(Mnemonic m, OpndSize memOpndSize,
                          int base_reg, bool isBasePhysical, int disp, int index_reg, bool isIndexPhysical, int scale,
                          OpndSize regOpndSize, int reg, bool isPhysical, LowOpndRegType type, char * stream);
 ENCODER_DECLARE_EXPORT char * encoder_movzs_mem_disp_scale_reg(Mnemonic m, OpndSize size,
