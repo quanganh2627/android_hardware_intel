@@ -22,6 +22,12 @@ LOCAL_PATH:= $(call my-dir)
 ifneq ($(LIBENC_INCLUDED),true)
 
 LIBENC_INCLUDED := true
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS_TO := libenc
+LOCAL_COPY_HEADERS := \
+    enc_wrapper.h \
+    enc_defs_ext.h
+include $(BUILD_COPY_HEADERS)
 
 enc_src_files := \
         enc_base.cpp \
