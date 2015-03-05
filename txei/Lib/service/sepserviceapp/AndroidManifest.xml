@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="com.intel.security.service"
+  android:versionCode="1"
+  android:versionName="1.0"
+  android:sharedUserId="android.uid.system">
+  <uses-sdk android:minSdkVersion="8" />
+
+  <application android:name=".SEPServiceApp" android:persistent="true">
+    <uses-library android:name="com.intel.security.service.sepmanager" android:required="true"/>
+    <uses-library android:name="com.intel.security.lib.sepdrmjni" android:required="true"/>
+  </application>
+
+  <permission android:name="com.intel.security.service.SEP_ACCESS"
+    android:protectionLevel="dangerous"
+    android:permissionGroup="android.permission-group.SYSTEM_TOOLS"
+    android:label="@string/sep_permission_label"
+    android:description="@string/sep_permission_description"/>
+</manifest>

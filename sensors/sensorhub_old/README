@@ -1,0 +1,8 @@
+1 prerequisite
+  - get libsensorhub code and compile it
+
+2 current feature
+  - AccelSensor can work with libsensorhub now
+
+3 TODO
+  - make other sensors work with libsensorhub after they're supported by psh_fw and libsensorhub

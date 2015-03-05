@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    >
+<RelativeLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/RelativeLayout"><Button android:id="@+id/Button01" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" android:text="@string/one" android:layout_width="wrap_content" android:width="100px" android:layout_marginLeft="10px"></Button>
+<Button android:id="@+id/Button02" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toRightOf="@+id/Button01" android:text="@string/two" android:layout_toLeftOf="@+id/Button03" android:width="100px"></Button>
+<Button android:id="@+id/Button03" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentTop="true" android:layout_alignParentRight="true" android:text="@string/three" android:width="100px" android:layout_marginRight="10px"></Button>
+<Button android:id="@+id/Button04" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/four" android:layout_below="@+id/Button01" android:layout_alignLeft="@+id/Button01" android:width="100px"></Button>
+<Button android:id="@+id/Button05" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toRightOf="@+id/Button04" android:layout_toLeftOf="@+id/Button06" android:text="@string/five" android:layout_alignBottom="@+id/Button04"></Button>
+<Button android:id="@+id/Button06" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:layout_alignBottom="@+id/Button05" android:text="@string/six" android:width="100px" android:layout_marginRight="10px"></Button>
+<Button android:id="@+id/Button07" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:text="@string/seven" android:layout_below="@+id/Button04" android:width="100px" android:layout_marginLeft="10px"></Button>
+<Button android:id="@+id/Button08" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toLeftOf="@+id/Button09" android:layout_toRightOf="@+id/Button07" android:layout_alignBottom="@+id/Button07" android:text="@string/eight"></Button>
+<Button android:id="@+id/Button09" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:text="@string/nine" android:layout_alignBottom="@+id/Button08" android:width="100px" android:layout_marginRight="10px"></Button>
+</RelativeLayout>
+<EditText android:layout_width="fill_parent" android:layout_height="fill_parent" android:id="@+id/LogText" android:clickable="false" android:layout_marginLeft="10px" android:layout_marginRight="10px" android:layout_marginBottom="15px" android:layout_marginTop="10px" android:focusable="false" android:focusableInTouchMode="false" android:scrollbarAlwaysDrawVerticalTrack="true"></EditText>
+</LinearLayout>

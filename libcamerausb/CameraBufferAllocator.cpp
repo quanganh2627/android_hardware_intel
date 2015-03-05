@@ -1,0 +1,236 @@
+/*
+ * Copyright (C) 2012 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+#include <assert.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include "CameraBufferAllocator.h"
+#include "Callbacks.h"
+#include "IntelMetadataBuffer.h"
+#include "CameraBuffer.h"
+#include "LogHelper.h"
+#define BATCH_SIZE      0x80000
+
+namespace android
+{
+
+//not thread safe yet.
+ICameraBufferAllocator* CameraMemoryAllocator::instance()
+{
+    static CameraMemoryAllocator theInstance;
+    return &theInstance;
+}
+
+CameraMemoryAllocator::CameraMemoryAllocator()
+{
+}
+
+CameraMemoryAllocator::~CameraMemoryAllocator()
+{
+}
+
+void* CameraMemoryAllocator::map(CameraBuffer* buf)
+{
+    if (buf->mCamMem == 0)
+        return 0;
+    buf->mData = buf->mCamMem->data;
+    return buf->mData;
+}
+
+int CameraMemoryAllocator::allocateMemory(CameraBuffer* buf, unsigned int size,
+        Callbacks* callbacks, int w, int h, int format)
+{
+    buf->mCamMem = callbacks->allocateMemory(size);
+    if (buf->mCamMem == 0 || buf->mCamMem->data == 0) {
+        return -1;
+    }
+    buf->mAllocPrivate = 0; //nothing else other than mCamMem
+    buf->mAlloc = this;
+    buf->mSize = size;
+    buf->mData = buf->mCamMem->data;//automatically mapped for this kind of memory
+    buf->mFormat = format;
+    buf->mWidth = (uint32_t)w;
+    buf->mHeight = (uint32_t)h;
+    return size;
+}
+
+int CameraMemoryAllocator::releaseMemory(CameraBuffer* buf)
+{
+     if (buf->mCamMem != 0)
+         buf->mCamMem->release(buf->mCamMem);
+     buf->mCamMem = 0;
+     buf->mData =0;
+     return 0;
+}
+
+int CameraMemoryAllocator::toMetaDataStream(CameraBuffer* buf)
+{
+    //do nothing because this type of memory holds raw video data
+    return buf->mSize;
+}
+
+static int getDRMFD()
+{
+    static const char* DRI_DEVICE_NAME="/dev/dri/card0";
+    struct stat st;
+    int fd;
+
+    if (-1 == stat (DRI_DEVICE_NAME, &st))
+    {
+        ALOGE("Cannot identify '%s': %d, %s\n",
+                DRI_DEVICE_NAME, errno, strerror (errno));
+        return -1;
+    }
+
+    if (!S_ISCHR (st.st_mode))
+    {
+        ALOGE("%s is no device\n", DRI_DEVICE_NAME);
+        return -1;
+    }
+
+    fd = open(DRI_DEVICE_NAME, O_RDWR);
+
+    if (-1 == fd)
+    {
+        ALOGE("Cannot open '%s': %d, %s\n",
+                DRI_DEVICE_NAME, errno, strerror (errno));
+        return -1;
+    }
+    //TODO: DRM Auth needs be done via surface flinger.
+    return fd;
+}
+
+bool CameraMemoryAllocator::bufferOwnsThisData (const CameraBuffer* buf, void* data)
+{
+    return buf->mCamMem !=0 && buf->mCamMem->data == data;
+}
+
+//not thread safe yet.
+ICameraBufferAllocator* GEMFlinkAllocator::instance()
+{
+    static GEMFlinkAllocator theInstance;
+    return &theInstance;
+}
+
+GEMFlinkAllocator::GEMFlinkAllocator()
+{
+    mDRMBufMgr = intel_bufmgr_gem_init(getDRMFD(), BATCH_SIZE);
+    assert(mDRMBufMgr != 0);
+    if(mDRMBufMgr != NULL)
+    {
+        intel_bufmgr_gem_enable_reuse(mDRMBufMgr);
+    }
+}
+
+GEMFlinkAllocator::~GEMFlinkAllocator()
+{
+    drm_intel_bufmgr_destroy(mDRMBufMgr);
+}
+
+// signal cpu write
+void* GEMFlinkAllocator::map(CameraBuffer* buf)
+{
+    drm_intel_bo* bo = (drm_intel_bo*)buf->mAllocPrivate;
+    if( drm_intel_bo_map(bo, true) )
+        return 0;
+    buf->mData = bo->virt;
+    return buf->mData;
+}
+
+// This also signals cpu write is done
+void GEMFlinkAllocator::unmap(CameraBuffer* buf)
+{
+    drm_intel_bo* bo = (drm_intel_bo*)buf->mAllocPrivate;
+    drm_intel_bo_unmap(bo);
+    buf->mData = 0;
+    return;
+}
+
+int GEMFlinkAllocator::allocateMemory(CameraBuffer* buf, unsigned int size,
+        Callbacks* callbacks, int w, int h, int format)
+{
+
+    drm_intel_bo* bo = drm_intel_bo_alloc(mDRMBufMgr, "CameraHAL",
+             size, 0x1000);//TODO:  alignment needs be negotiated
+
+    if(bo == NULL)
+         return -1;
+
+    buf->mCamMem = callbacks->allocateMemory(IntelMetadataBuffer::GetMaxBufferSize());
+    if(buf->mCamMem == 0 || buf->mCamMem->data == 0){
+        drm_intel_bo_unreference(bo);
+        return -1;
+    }
+    buf->mAllocPrivate = bo;
+    buf->mAlloc = this;
+    buf->mSize = bo->size;
+    buf->mFormat = format;
+    buf->mWidth = (uint32_t)w;
+    buf->mHeight = (uint32_t)h;
+    return bo->size;
+}
+
+int GEMFlinkAllocator::releaseMemory(CameraBuffer* buf)
+{
+    if (buf->mData != 0)
+        unmap(buf);
+    drm_intel_bo* bo = (drm_intel_bo*) buf->mAllocPrivate;
+    drm_intel_bo_unreference(bo);
+    buf->mAllocPrivate = 0;
+    buf->mData = 0;
+    if (buf->mCamMem != 0)
+        buf->mCamMem->release(buf->mCamMem);
+    buf->mCamMem = 0;
+    return 0;
+}
+
+int GEMFlinkAllocator::toMetaDataStream(CameraBuffer* buf)
+{
+    drm_intel_bo* bo = (drm_intel_bo*) buf->mAllocPrivate;
+    unsigned int flink;
+    if (drm_intel_bo_flink(bo, &flink))
+        return -1;
+    IntelMetadataBuffer imb;
+    ValueInfo vi;
+    memset(&vi, 0, sizeof(ValueInfo));
+    vi.mode = MEM_MODE_MALLOC;
+    vi.format = buf->mFormat; //fourcc
+    vi.chromStride = 0; //implied by fourcc and width
+    vi.handle = 0; // NA
+    vi.lumaStride = 0; //implied by fourcc and width;
+    vi.height = buf->mHeight;
+    vi.width = buf->mWidth;
+    vi.size = buf->mSize; //no need actually, put in just in case
+    imb.SetValueInfo(&vi);
+    uint8_t* data;
+    uint32_t size;
+    imb.Serialize(data, size);
+    if (size > IntelMetadataBuffer::GetMaxBufferSize())
+        return -1;
+    memcpy(buf->mCamMem->data, data, size);
+    return size;
+}
+
+bool GEMFlinkAllocator::bufferOwnsThisData (const CameraBuffer* buf, void* data)
+{
+    return ( buf->mCamMem !=0 && buf->mCamMem->data == data)
+            || buf->mData == data;
+}
+
+}//namespace

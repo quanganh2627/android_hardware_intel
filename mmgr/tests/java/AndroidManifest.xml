@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	package="com.intel.internal.telephony.mmgrtest"
+	android:versionCode="1"
+	android:versionName="1.0"
+	android:sharedUserId="android.uid.phone">
+	<uses-sdk
+		android:minSdkVersion="15"
+		android:targetSdkVersion="15" />
+	<application
+		android:icon="@drawable/ic_launcher"
+		android:label="@string/app_name"
+		android:theme="@style/AppTheme" >
+		<uses-library android:name="com.intel.internal.telephony.MmgrClient" android:required="true" />
+		<activity
+			android:name=".activities.MainActivity"
+			android:label="@string/app_name"
+			android:screenOrientation="portrait" >
+			<intent-filter>
+			<action android:name="android.intent.action.MAIN" />
+			<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+	</application>
+</manifest>

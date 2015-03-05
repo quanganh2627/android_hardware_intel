@@ -47,7 +47,6 @@ struct list *__queue_pop_head(struct queue *queue);
 void *queue_pop_head(struct queue *queue);
 struct list *__queue_pop_tail(struct queue *queue);
 void *queue_pop_tail(struct queue *queue);
-void *queue_remove(struct queue *queue, void *data);
 
 inline struct list *__queue_peek_head(struct queue *queue);
 inline struct list *__queue_peek_tail(struct queue *queue);

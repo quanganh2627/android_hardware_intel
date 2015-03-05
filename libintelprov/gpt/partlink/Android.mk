@@ -1,0 +1,19 @@
+LOCAL_PATH:= $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_C_INCLUDES:=  $(LOCAL_PATH)/../lib/include
+LOCAL_SRC_FILES:= main.c partlink.c
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_STATIC_LIBRARIES := libcgpt_static libc
+LOCAL_MODULE := partlink
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
+LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
+include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_C_INCLUDES:=  $(LOCAL_PATH)/../lib/include
+LOCAL_SRC_FILES:= partlink.c
+LOCAL_MODULE := libpartlink_static
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_STATIC_LIBRARY)

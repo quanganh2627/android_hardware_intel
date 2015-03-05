@@ -1,0 +1,13 @@
+# Copyright 2013 Intel Corporation                                        #
+#                                                                         #
+# This file lists the build product defined in JB r4.1 and compatibles    #
+# with the ro.product.device or ro.build.product defined in r4-main.      #
+#                                                                         #
+# This compatible table will allow flashing full or incremental OTA build #
+# on a device previously flashed with r4.1 build.                         #
+
+blackbay: mfld_pr2
+
+redhookbay: ctp_pr1
+
+lexington: mfld_gi

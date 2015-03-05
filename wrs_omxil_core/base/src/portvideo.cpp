@@ -25,10 +25,8 @@
 #include <componentbase.h>
 #include <portvideo.h>
 
-#ifdef ANDROID
 #define LOG_TAG "portvideo"
-#include <utils/Log.h>
-#endif
+#include <log.h>
 
 PortVideo::PortVideo()
 {
@@ -169,13 +167,11 @@ const OMX_VIDEO_CONFIG_PRI_INFOTYPE *PortVideo::GetPortPrivateInfoParam(void)
     return &privateinfoparam;
 }
 
-
 /* end of PortVideo */
-
+#if 0
 PortAvc::PortAvc()
 {
     OMX_VIDEO_PARAM_PORTFORMATTYPE videoparam;
-
     memcpy(&videoparam, GetPortVideoParam(), sizeof(videoparam));
     videoparam.eCompressionFormat = OMX_VIDEO_CodingAVC;
     videoparam.eColorFormat = OMX_COLOR_FormatUnused;
@@ -183,20 +179,17 @@ PortAvc::PortAvc()
     SetPortVideoParam(&videoparam, false);
 
     memset(&avcparam, 0, sizeof(avcparam));
-    memset(&avcprofilelevel, 0, sizeof(avcprofilelevel));
+    ComponentBase::SetTypeHeader(&avcparam, sizeof(avcparam));
 
-    avcparam.eProfile = OMX_VIDEO_AVCProfileVendorStartUnused;
-    avcparam.eLevel = OMX_VIDEO_AVCLevelVendorStartUnused;
-   
+    avcparam.eProfile = OMX_VIDEO_AVCProfileVendorStartUnused;  //defaul profle for buffer sharing in opencore
+    avcparam.eLevel = OMX_VIDEO_AVCLevelVendorStartUnused;     //default level for buffer sharing in opencore
+
 //set buffer sharing mode
 #ifdef COMPONENT_SUPPORT_BUFFER_SHARING
     SetPortBufferSharingInfo(OMX_TRUE);
 #endif
 
-    ComponentBase::SetTypeHeader(&avcparam, sizeof(avcparam));
-    ComponentBase::SetTypeHeader(&avcprofilelevel, sizeof(avcprofilelevel));
 }
-
 OMX_ERRORTYPE PortAvc::SetPortAvcParam(
     const OMX_VIDEO_PARAM_AVCTYPE *p, bool overwrite_readonly)
 {
@@ -218,7 +211,6 @@ OMX_ERRORTYPE PortAvc::SetPortAvcParam(
 
         avcparam.nPortIndex = p->nPortIndex;
     }
-
     avcparam.nSliceHeaderSpacing = p->nSliceHeaderSpacing;
     avcparam.nPFrames = p->nPFrames;
     avcparam.nBFrames = p->nBFrames;
@@ -253,6 +245,7 @@ OMX_ERRORTYPE PortAvc::SetPortAvcParam(
     avcparam.eProfile = p->eProfile;
     avcparam.eLevel = p->eLevel;
 #endif
+
     return OMX_ErrorNone;
 }
 
@@ -261,160 +254,6 @@ const OMX_VIDEO_PARAM_AVCTYPE *PortAvc::GetPortAvcParam(void)
     return &avcparam;
 }
 
-const OMX_VIDEO_PARAM_PROFILELEVELTYPE *PortAvc::GetPortAvcProfileLevel(void)
-{
-    return &avcprofilelevel;
-}
 /* end of PortAvc */
-
-PortMpeg4::PortMpeg4()
-{
-    OMX_VIDEO_PARAM_PORTFORMATTYPE videoparam;
-
-    memcpy(&videoparam, GetPortVideoParam(), sizeof(videoparam));
-    videoparam.eCompressionFormat = OMX_VIDEO_CodingMPEG4;
-    videoparam.eColorFormat = OMX_COLOR_FormatUnused;
-    videoparam.xFramerate = 15 << 16;
-    SetPortVideoParam(&videoparam, false);
-
-    memset(&mpeg4param, 0, sizeof(mpeg4param));
-    ComponentBase::SetTypeHeader(&mpeg4param, sizeof(mpeg4param));
-
-    mpeg4param.eProfile = OMX_VIDEO_MPEG4ProfileVendorStartUnused;
-    mpeg4param.eLevel = OMX_VIDEO_MPEG4LevelVendorStartUnused;
-
-#ifdef COMPONENT_SUPPORT_BUFFER_SHARING
-    SetPortBufferSharingInfo(OMX_TRUE);
 #endif
-}
-
-OMX_ERRORTYPE PortMpeg4::SetPortMpeg4Param(
-    const OMX_VIDEO_PARAM_MPEG4TYPE *p, bool overwrite_readonly)
-{
-    if (!overwrite_readonly) {
-        OMX_ERRORTYPE ret;
-
-        ret = ComponentBase::CheckTypeHeader((void *)p, sizeof(*p));
-        if (ret != OMX_ErrorNone)
-            return ret;
-        if (mpeg4param.nPortIndex != p->nPortIndex)
-            return OMX_ErrorBadPortIndex;
-    }
-    else {
-        OMX_VIDEO_PARAM_PORTFORMATTYPE videoparam;
-
-        memcpy(&videoparam, GetPortVideoParam(), sizeof(videoparam));
-        videoparam.nPortIndex = p->nPortIndex;
-        SetPortVideoParam(&videoparam, true);
-
-        mpeg4param.nPortIndex = p->nPortIndex;
-    }
-
-    mpeg4param.nSliceHeaderSpacing = p->nSliceHeaderSpacing;
-    mpeg4param.bSVH = p->bSVH;
-    mpeg4param.bGov = p->bGov;
-    mpeg4param.nPFrames = p->nPFrames;
-    mpeg4param.nBFrames = p->nBFrames;
-    mpeg4param.nIDCVLCThreshold = p->nIDCVLCThreshold;
-    mpeg4param.bACPred = p->bACPred;
-    mpeg4param.nMaxPacketSize = p->nMaxPacketSize;
-    mpeg4param.nTimeIncRes = p->nTimeIncRes;
-#ifdef COMPONENT_SUPPORT_OPENCORE
-#ifdef COMPONENT_SUPPORT_BUFFER_SHARING
-// sepcial case ,not change default profile and level for opencore buffer sharing.
-#else
-    mpeg4param.eProfile = p->eProfile;
-    mpeg4param.eLevel = p->eLevel;
-#endif
-#else
-    mpeg4param.eProfile = p->eProfile;
-    mpeg4param.eLevel = p->eLevel;
-#endif
-    mpeg4param.nAllowedPictureTypes = p->nAllowedPictureTypes;
-    mpeg4param.nHeaderExtension = p->nHeaderExtension;
-    mpeg4param.bReversibleVLC = p->bReversibleVLC;
-
-    return OMX_ErrorNone;
-}
-
-const OMX_VIDEO_PARAM_MPEG4TYPE *PortMpeg4::GetPortMpeg4Param(void)
-{
-    return &mpeg4param;
-}
-
-/* end of PortMpeg4 */
-
-PortH263::PortH263()
-{
-    OMX_VIDEO_PARAM_PORTFORMATTYPE videoparam;
-
-    memcpy(&videoparam, GetPortVideoParam(), sizeof(videoparam));
-    videoparam.eCompressionFormat = OMX_VIDEO_CodingH263;
-    videoparam.eColorFormat = OMX_COLOR_FormatUnused;
-    videoparam.xFramerate = 15 << 16;
-    SetPortVideoParam(&videoparam, false);
-
-    memset(&h263param, 0, sizeof(h263param));
-    ComponentBase::SetTypeHeader(&h263param, sizeof(h263param));
-
-    //set buffer sharing mode
-    h263param.eProfile = OMX_VIDEO_H263ProfileVendorStartUnused;
-    h263param.eLevel = OMX_VIDEO_H263LevelVendorStartUnused;
-
-#ifdef COMPONENT_SUPPORT_BUFFER_SHARING
-    SetPortBufferSharingInfo(OMX_TRUE);
-#endif
-	
-}
-
-OMX_ERRORTYPE PortH263::SetPortH263Param(
-    const OMX_VIDEO_PARAM_H263TYPE *p, bool overwrite_readonly)
-{
-    if (!overwrite_readonly) {
-        OMX_ERRORTYPE ret;
-
-        ret = ComponentBase::CheckTypeHeader((void *)p, sizeof(*p));
-        if (ret != OMX_ErrorNone)
-            return ret;
-        if (h263param.nPortIndex != p->nPortIndex)
-            return OMX_ErrorBadPortIndex;
-    }
-    else {
-        OMX_VIDEO_PARAM_PORTFORMATTYPE videoparam;
-
-        memcpy(&videoparam, GetPortVideoParam(), sizeof(videoparam));
-        videoparam.nPortIndex = p->nPortIndex;
-        SetPortVideoParam(&videoparam, true);
-
-        h263param.nPortIndex = p->nPortIndex;
-    }
-
-    h263param.nPFrames = p->nPFrames;
-    h263param.nBFrames = p->nBFrames;
-#ifdef COMPONENT_SUPPORT_OPENCORE
-#ifdef COMPONENT_SUPPORT_BUFFER_SHARING
-#else
-    h263param.eProfile = p->eProfile;
-    h263param.eLevel = p->eLevel;
-#endif
-#else
-    h263param.eProfile = p->eProfile;
-    h263param.eLevel = p->eLevel;
-#endif
-    h263param.bPLUSPTYPEAllowed        = p->bPLUSPTYPEAllowed;
-    h263param.nAllowedPictureTypes     = p->nAllowedPictureTypes;
-    h263param.bForceRoundingTypeToZero = p->bForceRoundingTypeToZero;
-    h263param.nPictureHeaderRepetition = p->nPictureHeaderRepetition;
-    h263param.nGOBHeaderInterval       = p->nGOBHeaderInterval;
-
-    return OMX_ErrorNone;
-}
-
-const OMX_VIDEO_PARAM_H263TYPE *PortH263::GetPortH263Param(void)
-{
-    return &h263param;
-}
-
-/* end of PortH263 */
-
 

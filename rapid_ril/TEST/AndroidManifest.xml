@@ -1,0 +1,27 @@
+<!--
+#
+# Copyright 2011 Intrinsyc Software International, Inc.  All rights reserved.
+#
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        package="com.android.RILTest"
+        android:sharedUserId="android.uid.system">
+
+    <original-package android:name="com.android.RILTest" />
+
+
+    <application android:label="@string/RILTest"
+            android:taskAffinity="">
+
+
+        <!-- For RIL OEM Hook Test -->
+        <activity android:name="RilOemHookTest" android:label="@string/testing_RIL_OEMHook" android:process="com.android.phone">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.DEVELOPMENT_PREFERENCE"/>
+            </intent-filter>
+        </activity>
+
+
+    </application>
+</manifest>

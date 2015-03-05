@@ -28,8 +28,18 @@
 
 #include <queue.h>
 #include <workqueue.h>
+#include <OMX_IndexExt.h>
+#include <HardwareAPI.h>
 
-#define DUMP 0
+//#define LOG_NDEBUG 0
+
+#define LOG_TAG "componentbase"
+#include <log.h>
+
+static const OMX_U32 kMaxAdaptiveStreamingWidth = 1920;
+static const OMX_U32 kMaxAdaptiveStreamingHeight = 1088;
+static const OMX_U32 kMaxForceBufferReallocWidth = 1920;
+static const OMX_U32 kMaxForceBufferReallocHeight = 1920;
 
 /*
  * CmdProcessWork
@@ -45,7 +55,7 @@ CmdProcessWork::CmdProcessWork(CmdHandlerInterface *ci)
 
     workq->StartWork(true);
 
-    omx_verboseLog("command process workqueue started\n");
+    LOGV("command process workqueue started\n");
 }
 
 CmdProcessWork::~CmdProcessWork()
@@ -60,7 +70,7 @@ CmdProcessWork::~CmdProcessWork()
 
     pthread_mutex_destroy(&lock);
 
-    omx_verboseLog("command process workqueue stopped\n");
+    LOGV("command process workqueue stopped\n");
 }
 
 OMX_ERRORTYPE CmdProcessWork::PushCmdQueue(struct cmd_s *cmd)
@@ -123,6 +133,8 @@ void ComponentBase::__ComponentBase(void)
 
     ports = NULL;
     nr_ports = 0;
+    mEnableAdaptivePlayback = OMX_FALSE;
+    mForceBufferRealloc = OMX_FALSE;
     memset(&portparam, 0, sizeof(portparam));
 
     state = OMX_StateUnloaded;
@@ -132,6 +144,7 @@ void ComponentBase::__ComponentBase(void)
     bufferwork = NULL;
 
     pthread_mutex_init(&ports_block, NULL);
+    pthread_mutex_init(&state_block, NULL);
 }
 
 ComponentBase::ComponentBase()
@@ -148,6 +161,7 @@ ComponentBase::ComponentBase(const OMX_STRING name)
 ComponentBase::~ComponentBase()
 {
     pthread_mutex_destroy(&ports_block);
+    pthread_mutex_destroy(&state_block);
 
     if (roles) {
         if (roles[0])
@@ -164,7 +178,8 @@ ComponentBase::~ComponentBase()
 /* name */
 void ComponentBase::SetName(const OMX_STRING name)
 {
-    strncpy(this->name, name, OMX_MAX_STRINGNAME_SIZE);
+    strncpy(this->name, name, (strlen(name) < OMX_MAX_STRINGNAME_SIZE) ? strlen(name) : (OMX_MAX_STRINGNAME_SIZE-1));
+   // strncpy(this->name, name, OMX_MAX_STRINGNAME_SIZE);
     this->name[OMX_MAX_STRINGNAME_SIZE-1] = '\0';
 }
 
@@ -263,7 +278,7 @@ OMX_ERRORTYPE ComponentBase::GetHandle(OMX_HANDLETYPE *pHandle,
     handle->pApplicationPrivate = pAppData;
 
     /* connect handle's functions */
-    handle->GetComponentVersion = GetComponentVersion;
+    handle->GetComponentVersion = NULL;
     handle->SendCommand = SendCommand;
     handle->GetParameter = GetParameter;
     handle->SetParameter = SetParameter;
@@ -271,21 +286,19 @@ OMX_ERRORTYPE ComponentBase::GetHandle(OMX_HANDLETYPE *pHandle,
     handle->SetConfig = SetConfig;
     handle->GetExtensionIndex = GetExtensionIndex;
     handle->GetState = GetState;
-    handle->ComponentTunnelRequest = ComponentTunnelRequest;
+    handle->ComponentTunnelRequest = NULL;
     handle->UseBuffer = UseBuffer;
     handle->AllocateBuffer = AllocateBuffer;
     handle->FreeBuffer = FreeBuffer;
     handle->EmptyThisBuffer = EmptyThisBuffer;
     handle->FillThisBuffer = FillThisBuffer;
     handle->SetCallbacks = SetCallbacks;
-    handle->ComponentDeInit = ComponentDeInit;
-    handle->UseEGLImage = UseEGLImage;
+    handle->ComponentDeInit = NULL;
+    handle->UseEGLImage = NULL;
     handle->ComponentRoleEnum = ComponentRoleEnum;
 
     appdata = pAppData;
-    callbacks.EventHandler=pCallBacks->EventHandler;
-    callbacks.EmptyBufferDone=pCallBacks->EmptyBufferDone;
-    callbacks.FillBufferDone=pCallBacks->FillBufferDone;
+    callbacks = pCallBacks;
 
     if (nr_roles == 1) {
         SetWorkingRole((OMX_STRING)&roles[0][0]);
@@ -304,6 +317,7 @@ free_handle:
     free(handle);
 
     appdata = NULL;
+    callbacks = NULL;
     *pHandle = NULL;
 
 free_bufferwork:
@@ -330,6 +344,7 @@ OMX_ERRORTYPE ComponentBase::FreeHandle(OMX_HANDLETYPE hComponent)
     free(handle);
 
     appdata = NULL;
+    callbacks = NULL;
 
     delete cmdwork;
     delete bufferwork;
@@ -343,44 +358,6 @@ OMX_ERRORTYPE ComponentBase::FreeHandle(OMX_HANDLETYPE hComponent)
 /*
  * component methods & helpers
  */
-OMX_ERRORTYPE ComponentBase::GetComponentVersion(
-    OMX_IN  OMX_HANDLETYPE hComponent,
-    OMX_OUT OMX_STRING pComponentName,
-    OMX_OUT OMX_VERSIONTYPE* pComponentVersion,
-    OMX_OUT OMX_VERSIONTYPE* pSpecVersion,
-    OMX_OUT OMX_UUIDTYPE* pComponentUUID)
-{
-    ComponentBase *cbase;
-
-    if (!hComponent)
-        return OMX_ErrorBadParameter;
-
-    cbase = static_cast<ComponentBase *>
-        (((OMX_COMPONENTTYPE *)hComponent)->pComponentPrivate);
-    if (!cbase)
-        return OMX_ErrorBadParameter;
-
-    return cbase->CBaseGetComponentVersion(hComponent,
-                                           pComponentName,
-                                           pComponentVersion,
-                                           pSpecVersion,
-                                           pComponentUUID);
-}
-
-OMX_ERRORTYPE ComponentBase::CBaseGetComponentVersion(
-    OMX_IN  OMX_HANDLETYPE hComponent,
-    OMX_OUT OMX_STRING pComponentName,
-    OMX_OUT OMX_VERSIONTYPE* pComponentVersion,
-    OMX_OUT OMX_VERSIONTYPE* pSpecVersion,
-    OMX_OUT OMX_UUIDTYPE* pComponentUUID)
-{
-    /*
-     * Todo
-     */
-
-    return OMX_ErrorNotImplemented;
-}
-
 OMX_ERRORTYPE ComponentBase::SendCommand(
     OMX_IN  OMX_HANDLETYPE hComponent,
     OMX_IN  OMX_COMMANDTYPE Cmd,
@@ -454,7 +431,7 @@ OMX_ERRORTYPE ComponentBase::CBaseSendCommand(
         break;
     }
     default:
-        omx_errorLog("command %d not supported\n", Cmd);
+        LOGE("command %d not supported\n", Cmd);
         return OMX_ErrorUnsupportedIndex;
     }
 
@@ -497,7 +474,6 @@ OMX_ERRORTYPE ComponentBase::CBaseGetParameter(
 
     if (hComponent != handle)
         return OMX_ErrorBadParameter;
-
     switch (nParamIndex) {
     case OMX_IndexParamAudioInit:
     case OMX_IndexParamVideoInit:
@@ -539,6 +515,7 @@ OMX_ERRORTYPE ComponentBase::CBaseGetParameter(
 
         ret = OMX_ErrorUnsupportedIndex;
         break;
+
     default:
         ret = ComponentGetParameter(nParamIndex, pComponentParameterStructure);
     } /* switch */
@@ -604,7 +581,22 @@ OMX_ERRORTYPE ComponentBase::CBaseSetParameter(
                 return OMX_ErrorIncorrectStateOperation;
         }
 
-        port->SetPortDefinition(p, false);
+        if (index == 1 && mEnableAdaptivePlayback == OMX_TRUE) {
+            if (p->format.video.nFrameWidth < mMaxFrameWidth)
+                p->format.video.nFrameWidth = mMaxFrameWidth;
+            if (p->format.video.nFrameHeight < mMaxFrameHeight)
+                p->format.video.nFrameHeight = mMaxFrameHeight;
+        }
+
+        if (working_role != NULL && !strncmp((char*)working_role, "video_encoder", 13)) {
+            if(p->format.video.eColorFormat == OMX_COLOR_FormatUnused)
+                p->nBufferSize = p->format.video.nFrameWidth * p->format.video.nFrameHeight *3/2;
+        }
+
+        ret = port->SetPortDefinition(p, false);
+        if (ret != OMX_ErrorNone) {
+            return ret;
+        }
         break;
     }
     case OMX_IndexParamCompBufferSupplier:
@@ -639,6 +631,50 @@ OMX_ERRORTYPE ComponentBase::CBaseSetParameter(
         }
         break;
     }
+    case OMX_IndexExtPrepareForAdaptivePlayback: {
+        android::PrepareForAdaptivePlaybackParams* p =
+                (android::PrepareForAdaptivePlaybackParams *)pComponentParameterStructure;
+
+        ret = CheckTypeHeader(p, sizeof(*p));
+        if (ret != OMX_ErrorNone)
+            return ret;
+
+        if (p->nPortIndex != 1)
+            return OMX_ErrorBadPortIndex;
+
+        if (!(working_role != NULL && !strncmp((char*)working_role, "video_decoder", 13)))
+            return  OMX_ErrorBadParameter;
+
+        if (p->bEnable && (p->nMaxFrameWidth == kMaxForceBufferReallocWidth &&
+            p->nMaxFrameHeight == kMaxForceBufferReallocHeight)) {
+            LOGW(" Buffer should be reallocated!");
+            mForceBufferRealloc = OMX_TRUE;
+        }
+
+        if (p->nMaxFrameWidth > kMaxAdaptiveStreamingWidth
+                || p->nMaxFrameHeight > kMaxAdaptiveStreamingHeight) {
+            LOGE("resolution %d x %d exceed max driver support %d x %d\n",p->nMaxFrameWidth, p->nMaxFrameHeight,
+                    kMaxAdaptiveStreamingWidth, kMaxAdaptiveStreamingHeight);
+            return OMX_ErrorBadParameter;
+        }
+        mEnableAdaptivePlayback = p->bEnable;
+        if (mEnableAdaptivePlayback != OMX_TRUE)
+            return OMX_ErrorBadParameter;
+
+        mMaxFrameWidth = p->nMaxFrameWidth;
+        mMaxFrameHeight = p->nMaxFrameHeight;
+        /* update output port definition */
+        OMX_PARAM_PORTDEFINITIONTYPE paramPortDefinitionOutput;
+        if (nr_ports > p->nPortIndex && ports[p->nPortIndex]) {
+            memcpy(&paramPortDefinitionOutput,ports[p->nPortIndex]->GetPortDefinition(),
+                    sizeof(paramPortDefinitionOutput));
+            paramPortDefinitionOutput.format.video.nFrameWidth = mMaxFrameWidth;
+            paramPortDefinitionOutput.format.video.nFrameHeight = mMaxFrameHeight;
+            ports[p->nPortIndex]->SetPortDefinition(&paramPortDefinitionOutput, true);
+        }
+        break;
+    }
+
     default:
         ret = ComponentSetParameter(nIndex, pComponentParameterStructure);
     } /* switch */
@@ -708,7 +744,7 @@ OMX_ERRORTYPE ComponentBase::CBaseSetConfig(
     OMX_IN  OMX_PTR pComponentConfigStructure)
 {
     OMX_ERRORTYPE ret;
-
+ 
     if (hComponent != handle)
         return OMX_ErrorBadParameter;
 
@@ -744,25 +780,77 @@ OMX_ERRORTYPE ComponentBase::CBaseGetExtensionIndex(
     OMX_IN  OMX_STRING cParameterName,
     OMX_OUT OMX_INDEXTYPE* pIndexType)
 {
-    OMX_ERRORTYPE err= OMX_ErrorNone;
+    /*
+     * Todo
+     */
     if (hComponent != handle) {
-        return OMX_ErrorBadParameter;
-    };
 
-    int i =0;
-    while (i < NUM_EXT_PARAMS) {
-        if(!strncmp(cParameterName,PARAMEXT[i].sParamString, strlen(PARAMEXT[i].sParamString))) {
-            *pIndexType =  PARAMEXT[i].sIndex;
-            err = PARAMEXT[i].sRetValue;
-            break;
-        } else {
-           i++;
-        }
+        return OMX_ErrorBadParameter;
     }
-    if(i == NUM_EXT_PARAMS) {
-        err = OMX_ErrorUnsupportedIndex;
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.storeMetaDataInBuffers")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexStoreMetaDataInBuffers);
+        return OMX_ErrorNone;
     }
-    return err;
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.enableAndroidNativeBuffers")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtEnableNativeBuffer);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.getAndroidNativeBufferUsage")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtGetNativeBufferUsage);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.useAndroidNativeBuffer")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtUseNativeBuffer);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.Intel.index.rotation")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtRotationDegrees);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.Intel.index.enableSyncEncoding")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtSyncEncoding);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.prependSPSPPSToIDRFrames")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtPrependSPSPPS);
+        return OMX_ErrorNone;
+    }
+
+#ifdef TARGET_HAS_VPP
+    if (!strcmp(cParameterName, "OMX.Intel.index.vppBufferNum")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtVppBufferNum);
+        return OMX_ErrorNone;
+    }
+#endif
+    
+    if (!strcmp(cParameterName, "OMX.Intel.index.enableErrorReport")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtEnableErrorReport);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.google.android.index.prepareForAdaptivePlayback")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtPrepareForAdaptivePlayback);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.Intel.index.vp8MaxFrameRatio")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtVP8MaxFrameSizeRatio);
+        return OMX_ErrorNone;
+    }
+
+    if (!strcmp(cParameterName, "OMX.Intel.index.temporalLayer")) {
+        *pIndexType = static_cast<OMX_INDEXTYPE>(OMX_IndexExtTemporalLayer);
+        return OMX_ErrorNone;
+    }
+
+    return OMX_ErrorUnsupportedIndex;
 }
 
 OMX_ERRORTYPE ComponentBase::GetState(
@@ -789,46 +877,11 @@ OMX_ERRORTYPE ComponentBase::CBaseGetState(
     if (hComponent != handle)
         return OMX_ErrorBadParameter;
 
+    pthread_mutex_lock(&state_block);
     *pState = state;
+    pthread_mutex_unlock(&state_block);
     return OMX_ErrorNone;
 }
-
-OMX_ERRORTYPE ComponentBase::ComponentTunnelRequest(
-    OMX_IN  OMX_HANDLETYPE hComponent,
-    OMX_IN  OMX_U32 nPort,
-    OMX_IN  OMX_HANDLETYPE hTunneledComponent,
-    OMX_IN  OMX_U32 nTunneledPort,
-    OMX_INOUT  OMX_TUNNELSETUPTYPE* pTunnelSetup)
-{
-    ComponentBase *cbase;
-
-    if (!hComponent)
-        return OMX_ErrorBadParameter;
-
-    cbase = static_cast<ComponentBase *>
-        (((OMX_COMPONENTTYPE *)hComponent)->pComponentPrivate);
-    if (!cbase)
-        return OMX_ErrorBadParameter;
-
-    return cbase->CBaseComponentTunnelRequest(hComponent, nPort,
-                                              hTunneledComponent,
-                                              nTunneledPort, pTunnelSetup);
-}
-
-OMX_ERRORTYPE ComponentBase::CBaseComponentTunnelRequest(
-    OMX_IN  OMX_HANDLETYPE hComp,
-    OMX_IN  OMX_U32 nPort,
-    OMX_IN  OMX_HANDLETYPE hTunneledComp,
-    OMX_IN  OMX_U32 nTunneledPort,
-    OMX_INOUT  OMX_TUNNELSETUPTYPE* pTunnelSetup)
-{
-    /*
-     * Todo
-     */
-
-    return OMX_ErrorNotImplemented;
-}
-
 OMX_ERRORTYPE ComponentBase::UseBuffer(
     OMX_IN OMX_HANDLETYPE hComponent,
     OMX_INOUT OMX_BUFFERHEADERTYPE **ppBufferHdr,
@@ -884,13 +937,8 @@ OMX_ERRORTYPE ComponentBase::CBaseUseBuffer(
             return OMX_ErrorIncorrectStateOperation;
     }
 
-
-   ret = port->UseBuffer(ppBufferHdr, nPortIndex, pAppPrivate, nSizeBytes,
+    return port->UseBuffer(ppBufferHdr, nPortIndex, pAppPrivate, nSizeBytes,
                            pBuffer);
-   omx_verboseLog("ComponentBase::CBaseUseBuffer() port->UseBuffer() returned %p, calling ProcessorUseNativeBuffer() nPortIndex = %d", ret, nPortIndex);
-   ProcessorUseNativeBuffer(nPortIndex, *ppBufferHdr);
-   return ret;
-
 }
 
 OMX_ERRORTYPE ComponentBase::AllocateBuffer(
@@ -984,6 +1032,9 @@ OMX_ERRORTYPE ComponentBase::CBaseFreeBuffer(
 
     if (!port)
         return OMX_ErrorBadParameter;
+
+    ProcessorPreFreeBuffer(nPortIndex, pBuffer);
+
     return port->FreeBuffer(nPortIndex, pBuffer);
 }
 
@@ -1030,9 +1081,6 @@ OMX_ERRORTYPE ComponentBase::CBaseEmptyThisBuffer(
     if (!port)
         return OMX_ErrorBadParameter;
 
-    if (pBuffer->pInputPortPrivate != port)
-        return OMX_ErrorBadParameter;
-
     if (port->IsEnabled()) {
         if (state != OMX_StateIdle && state != OMX_StateExecuting &&
             state != OMX_StatePause)
@@ -1049,6 +1097,8 @@ OMX_ERRORTYPE ComponentBase::CBaseEmptyThisBuffer(
             free(mark);
         }
     }
+
+    ProcessorPreEmptyBuffer(pBuffer);
 
     ret = port->PushThisBuffer(pBuffer);
     if (ret == OMX_ErrorNone)
@@ -1106,7 +1156,6 @@ OMX_ERRORTYPE ComponentBase::CBaseFillThisBuffer(
             return OMX_ErrorIncorrectStateOperation;
     }
 
-    omx_verboseLog("CBaseFillThisBuffer , sending %p", pBuffer->pBuffer);
     ProcessorPreFillBuffer(pBuffer);
 
     ret = port->PushThisBuffer(pBuffer);
@@ -1143,73 +1192,9 @@ OMX_ERRORTYPE ComponentBase::CBaseSetCallbacks(
         return OMX_ErrorBadParameter;
 
     appdata = pAppData;
-    callbacks.EventHandler=pCallbacks->EventHandler;
-    callbacks.EmptyBufferDone=pCallbacks->EmptyBufferDone;
-    callbacks.FillBufferDone=pCallbacks->FillBufferDone;
-
+    callbacks = pCallbacks;
 
     return OMX_ErrorNone;
-}
-
-OMX_ERRORTYPE ComponentBase::ComponentDeInit(
-    OMX_IN  OMX_HANDLETYPE hComponent)
-{
-    ComponentBase *cbase;
-
-    if (!hComponent)
-        return OMX_ErrorBadParameter;
-
-    cbase = static_cast<ComponentBase *>
-        (((OMX_COMPONENTTYPE *)hComponent)->pComponentPrivate);
-    if (!cbase)
-        return OMX_ErrorBadParameter;
-
-    return cbase->CBaseComponentDeInit(hComponent);
-}
-
-OMX_ERRORTYPE ComponentBase::CBaseComponentDeInit(
-    OMX_IN  OMX_HANDLETYPE hComponent)
-{
-    /*
-     * Todo
-     */
-
-    return OMX_ErrorNotImplemented;
-}
-
-OMX_ERRORTYPE ComponentBase::UseEGLImage(
-    OMX_IN OMX_HANDLETYPE hComponent,
-    OMX_INOUT OMX_BUFFERHEADERTYPE** ppBufferHdr,
-    OMX_IN OMX_U32 nPortIndex,
-    OMX_IN OMX_PTR pAppPrivate,
-    OMX_IN void* eglImage)
-{
-    ComponentBase *cbase;
-
-    if (!hComponent)
-        return OMX_ErrorBadParameter;
-
-    cbase = static_cast<ComponentBase *>
-        (((OMX_COMPONENTTYPE *)hComponent)->pComponentPrivate);
-    if (!cbase)
-        return OMX_ErrorBadParameter;
-
-    return cbase->CBaseUseEGLImage(hComponent, ppBufferHdr, nPortIndex,
-                                   pAppPrivate, eglImage);
-}
-
-OMX_ERRORTYPE ComponentBase::CBaseUseEGLImage(
-    OMX_IN OMX_HANDLETYPE hComponent,
-    OMX_INOUT OMX_BUFFERHEADERTYPE** ppBufferHdr,
-    OMX_IN OMX_U32 nPortIndex,
-    OMX_IN OMX_PTR pAppPrivate,
-    OMX_IN void* eglImage)
-{
-    /*
-     * Todo
-     */
-
-    return OMX_ErrorNotImplemented;
 }
 
 OMX_ERRORTYPE ComponentBase::ComponentRoleEnum(
@@ -1238,7 +1223,7 @@ OMX_ERRORTYPE ComponentBase::CBaseComponentRoleEnum(
     if (hComponent != (OMX_HANDLETYPE *)this->handle)
         return OMX_ErrorBadParameter;
 
-    if (nIndex > nr_roles)
+    if (nIndex >= nr_roles)
         return OMX_ErrorBadParameter;
 
     strncpy((char *)cRole, (const char *)roles[nIndex],
@@ -1266,35 +1251,35 @@ static inline const char *GetCmdName(OMX_COMMANDTYPE cmd)
 
 void ComponentBase::CmdHandler(struct cmd_s *cmd)
 {
-    omx_verboseLog("%s:%s: handling %s command\n",
+    LOGV("%s:%s: handling %s command\n",
          GetName(), GetWorkingRole(), GetCmdName(cmd->cmd));
 
     switch (cmd->cmd) {
     case OMX_CommandStateSet: {
         OMX_STATETYPE transition = (OMX_STATETYPE)cmd->param1;
 
+        pthread_mutex_lock(&state_block);
         TransState(transition);
+        pthread_mutex_unlock(&state_block);
         break;
     }
     case OMX_CommandFlush: {
         OMX_U32 port_index = cmd->param1;
-	ProcessorReleaseLock();
-        FlushPort(port_index, 1);
         pthread_mutex_lock(&ports_block);
         ProcessorFlush(port_index);
+        FlushPort(port_index, 1);
         pthread_mutex_unlock(&ports_block);
         break;
     }
     case OMX_CommandPortDisable: {
         OMX_U32 port_index = cmd->param1;
-	    ProcessorReleaseLock();
-            ProcessorEnableNativeBuffers();
+
         TransStatePort(port_index, PortBase::OMX_PortDisabled);
         break;
     }
     case OMX_CommandPortEnable: {
         OMX_U32 port_index = cmd->param1;
-	    ProcessorReleaseLock();
+
         TransStatePort(port_index, PortBase::OMX_PortEnabled);
         break;
     }
@@ -1306,12 +1291,12 @@ void ComponentBase::CmdHandler(struct cmd_s *cmd)
         break;
     }
     default:
-        omx_errorLog("%s:%s:%s: exit failure, command %d cannot be handled\n",
+        LOGE("%s:%s:%s: exit failure, command %d cannot be handled\n",
              GetName(), GetWorkingRole(), GetCmdName(cmd->cmd), cmd->cmd);
         break;
     } /* switch */
 
-    omx_verboseLog("%s:%s: command %s handling done\n",
+    LOGV("%s:%s: command %s handling done\n",
          GetName(), GetWorkingRole(), GetCmdName(cmd->cmd));
 }
 
@@ -1351,14 +1336,14 @@ void ComponentBase::TransState(OMX_STATETYPE transition)
     OMX_U32 data1, data2;
     OMX_ERRORTYPE ret;
 
-    omx_verboseLog("%s:%s: try to transit state from %s to %s\n",
+    LOGV("%s:%s: try to transit state from %s to %s\n",
          GetName(), GetWorkingRole(), GetStateName(current),
          GetStateName(transition));
 
     /* same state */
     if (current == transition) {
         ret = OMX_ErrorSameState;
-        omx_errorLog("%s:%s: exit failure, same state (%s)\n",
+        LOGE("%s:%s: exit failure, same state (%s)\n",
              GetName(), GetWorkingRole(), GetStateName(current));
         goto notify_event;
     }
@@ -1366,7 +1351,7 @@ void ComponentBase::TransState(OMX_STATETYPE transition)
     /* invalid state */
     if (current == OMX_StateInvalid) {
         ret = OMX_ErrorInvalidState;
-        omx_errorLog("%s:%s: exit failure, current state is OMX_StateInvalid\n",
+        LOGE("%s:%s: exit failure, current state is OMX_StateInvalid\n",
              GetName(), GetWorkingRole());
         goto notify_event;
     }
@@ -1393,7 +1378,7 @@ notify_event:
         data2 = transition;
 
         state = transition;
-        omx_debugLog("%s:%s: transition from %s to %s completed",
+        LOGD("%s:%s: transition from %s to %s completed",
              GetName(), GetWorkingRole(),
              GetStateName(current), GetStateName(transition));
     }
@@ -1404,18 +1389,18 @@ notify_event:
 
         if (transition == OMX_StateInvalid || ret == OMX_ErrorInvalidState) {
             state = OMX_StateInvalid;
-            omx_errorLog("%s:%s: exit failure, transition from %s to %s, "
+            LOGE("%s:%s: exit failure, transition from %s to %s, "
                  "current state is %s\n",
                  GetName(), GetWorkingRole(), GetStateName(current),
                  GetStateName(transition), GetStateName(state));
         }
     }
 
-    callbacks.EventHandler(handle, appdata, event, data1, data2, NULL);
+    callbacks->EventHandler(handle, appdata, event, data1, data2, NULL);
 
     /* WaitForResources workaround */
     if (ret == OMX_ErrorNone && transition == OMX_StateWaitForResources)
-        callbacks.EventHandler(handle, appdata,
+        callbacks->EventHandler(handle, appdata,
                                 OMX_EventResourcesAcquired, 0, 0, NULL);
 }
 
@@ -1435,14 +1420,14 @@ inline OMX_ERRORTYPE ComponentBase::TransStateToLoaded(OMX_STATETYPE current)
 
         ret = ProcessorDeinit();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorDeinit() failed "
+            LOGE("%s:%s: ProcessorDeinit() failed "
                  "(ret : 0x%08x)\n", GetName(), GetWorkingRole(),
                  ret);
             goto out;
         }
     }
     else if (current == OMX_StateWaitForResources) {
-        omx_verboseLog("%s:%s: "
+        LOGV("%s:%s: "
              "state transition's requested from WaitForResources to Loaded\n",
              GetName(), GetWorkingRole());
 
@@ -1466,47 +1451,47 @@ inline OMX_ERRORTYPE ComponentBase::TransStateToIdle(OMX_STATETYPE current)
 
     if (current == OMX_StateLoaded) {
         OMX_U32 i;
+        for (i = 0; i < nr_ports; i++) {
+             if (ports[i]->IsEnabled())
+                 ports[i]->WaitPortBufferCompletion();
+        }
 
-        ret = ProcessorInit(cmodule->GetParser());
+        ret = ProcessorInit();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorInit() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorInit() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
-
-        for (i = 0; i < nr_ports; i++) {
-            if (ports[i]->IsEnabled())
-                ports[i]->WaitPortBufferCompletion();
-        }
     }
     else if ((current == OMX_StatePause) || (current == OMX_StateExecuting)) {
-        ProcessorReleaseLock();
+        pthread_mutex_lock(&ports_block);
         FlushPort(OMX_ALL, 0);
-        omx_verboseLog("%s:%s: flushed all ports\n", GetName(), GetWorkingRole());
+        pthread_mutex_unlock(&ports_block);
+        LOGV("%s:%s: flushed all ports\n", GetName(), GetWorkingRole());
 
         bufferwork->CancelScheduledWork(this);
-        omx_verboseLog("%s:%s: discarded all scheduled buffer process work\n",
+        LOGV("%s:%s: discarded all scheduled buffer process work\n",
              GetName(), GetWorkingRole());
 
         if (current == OMX_StatePause) {
             bufferwork->ResumeWork();
-            omx_verboseLog("%s:%s: buffer process work resumed\n",
+            LOGV("%s:%s: buffer process work resumed\n",
                  GetName(), GetWorkingRole());
         }
 
         bufferwork->StopWork();
-        omx_verboseLog("%s:%s: buffer process work stopped\n",
+        LOGV("%s:%s: buffer process work stopped\n",
              GetName(), GetWorkingRole());
 
         ret = ProcessorStop();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorStop() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorStop() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
     }
     else if (current == OMX_StateWaitForResources) {
-        omx_verboseLog("%s:%s: "
+        LOGV("%s:%s: "
              "state transition's requested from WaitForResources to Idle\n",
              GetName(), GetWorkingRole());
 
@@ -1528,24 +1513,24 @@ ComponentBase::TransStateToExecuting(OMX_STATETYPE current)
 
     if (current == OMX_StateIdle) {
         bufferwork->StartWork(true);
-        omx_verboseLog("%s:%s: buffer process work started with executing state\n",
+        LOGV("%s:%s: buffer process work started with executing state\n",
              GetName(), GetWorkingRole());
 
         ret = ProcessorStart();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorStart() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorStart() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
     }
     else if (current == OMX_StatePause) {
         bufferwork->ResumeWork();
-        omx_verboseLog("%s:%s: buffer process work resumed\n",
+        LOGV("%s:%s: buffer process work resumed\n",
              GetName(), GetWorkingRole());
 
         ret = ProcessorResume();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorResume() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorResume() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
@@ -1563,24 +1548,24 @@ inline OMX_ERRORTYPE ComponentBase::TransStateToPause(OMX_STATETYPE current)
 
     if (current == OMX_StateIdle) {
         bufferwork->StartWork(false);
-        omx_verboseLog("%s:%s: buffer process work started with paused state\n",
+        LOGV("%s:%s: buffer process work started with paused state\n",
              GetName(), GetWorkingRole());
 
         ret = ProcessorStart();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorSart() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorSart() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
     }
     else if (current == OMX_StateExecuting) {
         bufferwork->PauseWork();
-        omx_verboseLog("%s:%s: buffer process work paused\n",
+        LOGV("%s:%s: buffer process work paused\n",
              GetName(), GetWorkingRole());
 
         ret = ProcessorPause();
         if (ret != OMX_ErrorNone) {
-            omx_errorLog("%s:%s: ProcessorPause() failed (ret : 0x%08x)\n",
+            LOGE("%s:%s: ProcessorPause() failed (ret : 0x%08x)\n",
                  GetName(), GetWorkingRole(), ret);
             goto out;
         }
@@ -1610,7 +1595,7 @@ ComponentBase::TransStateToWaitForResources(OMX_STATETYPE current)
     OMX_ERRORTYPE ret;
 
     if (current == OMX_StateLoaded) {
-        omx_verboseLog("%s:%s: "
+        LOGV("%s:%s: "
              "state transition's requested from Loaded to WaitForResources\n",
              GetName(), GetWorkingRole());
         ret = OMX_ErrorNone;
@@ -1657,7 +1642,7 @@ notify_event:
         data2 = 0;
     }
 
-    callbacks.EventHandler(handle, appdata, event, data1, data2, NULL);
+    callbacks->EventHandler(handle, appdata, event, data1, data2, NULL);
 }
 
 void ComponentBase::FlushPort(OMX_U32 port_index, bool notify)
@@ -1676,19 +1661,17 @@ void ComponentBase::FlushPort(OMX_U32 port_index, bool notify)
         to_index = port_index;
     }
 
-    omx_verboseLog("%s:%s: flush ports (from index %lu to %lu)\n",
+    LOGV("%s:%s: flush ports (from index %lu to %lu)\n",
          GetName(), GetWorkingRole(), from_index, to_index);
 
-    pthread_mutex_lock(&ports_block);
     for (i = from_index; i <= to_index; i++) {
         ports[i]->FlushPort();
         if (notify)
-            callbacks.EventHandler(handle, appdata, OMX_EventCmdComplete,
+            callbacks->EventHandler(handle, appdata, OMX_EventCmdComplete,
                                     OMX_CommandFlush, i, NULL);
     }
-    pthread_mutex_unlock(&ports_block);
 
-    omx_verboseLog("%s:%s: flush ports done\n", GetName(), GetWorkingRole());
+    LOGV("%s:%s: flush ports done\n", GetName(), GetWorkingRole());
 }
 
 extern const char *GetPortStateName(OMX_U8 state); //portbase.cpp
@@ -1712,7 +1695,7 @@ void ComponentBase::TransStatePort(OMX_U32 port_index, OMX_U8 state)
         to_index = port_index;
     }
 
-    omx_verboseLog("%s:%s: transit ports state to %s (from index %lu to %lu)\n",
+    LOGV("%s:%s: transit ports state to %s (from index %lu to %lu)\n",
          GetName(), GetWorkingRole(), GetPortStateName(state),
          from_index, to_index);
 
@@ -1721,10 +1704,12 @@ void ComponentBase::TransStatePort(OMX_U32 port_index, OMX_U8 state)
         ret = ports[i]->TransState(state);
         if (ret == OMX_ErrorNone) {
             event = OMX_EventCmdComplete;
-            if (state == PortBase::OMX_PortEnabled)
+            if (state == PortBase::OMX_PortEnabled) {
                 data1 = OMX_CommandPortEnable;
-            else
+                ProcessorReset();
+            } else {
                 data1 = OMX_CommandPortDisable;
+            }
             data2 = i;
         }
         else {
@@ -1732,12 +1717,12 @@ void ComponentBase::TransStatePort(OMX_U32 port_index, OMX_U8 state)
             data1 = ret;
             data2 = 0;
         }
-        callbacks.EventHandler(handle, appdata, OMX_EventCmdComplete,
+        callbacks->EventHandler(handle, appdata, OMX_EventCmdComplete,
                                 data1, data2, NULL);
     }
     pthread_mutex_unlock(&ports_block);
 
-    omx_verboseLog("%s:%s: transit ports state to %s completed\n",
+    LOGV("%s:%s: transit ports state to %s completed\n",
          GetName(), GetWorkingRole(), GetPortStateName(state));
 }
 
@@ -1761,7 +1746,7 @@ OMX_ERRORTYPE ComponentBase::SetWorkingRole(const OMX_STRING role)
         }
     }
 
-    omx_errorLog("%s: cannot find %s role\n", GetName(), role);
+    LOGE("%s: cannot find %s role\n", GetName(), role);
     return OMX_ErrorBadParameter;
 }
 
@@ -1777,23 +1762,22 @@ OMX_ERRORTYPE ComponentBase::ApplyWorkingRole(void)
     if (!working_role)
         return OMX_ErrorBadParameter;
 
-    if (!callbacks.EventHandler || !callbacks.EmptyBufferDone
-		    || !callbacks.FillBufferDone || !appdata)
+    if (!callbacks || !appdata)
         return OMX_ErrorBadParameter;
 
     ret = AllocatePorts();
     if (ret != OMX_ErrorNone) {
-        omx_errorLog("failed to AllocatePorts() (ret = 0x%08x)\n", ret);
+        LOGE("failed to AllocatePorts() (ret = 0x%08x)\n", ret);
         return ret;
     }
 
     /* now we can access ports */
     for (i = 0; i < nr_ports; i++) {
         ports[i]->SetOwner(handle);
-        ports[i]->SetCallbacks(handle, &callbacks, appdata);
+        ports[i]->SetCallbacks(handle, callbacks, appdata);
     }
 
-    omx_verboseLog("%s: set working role %s:", GetName(), GetWorkingRole());
+    LOGI("%s: set working role %s:", GetName(), GetWorkingRole());
     return OMX_ErrorNone;
 }
 
@@ -1809,7 +1793,7 @@ OMX_ERRORTYPE ComponentBase::AllocatePorts(void)
 
     ret = ComponentAllocatePorts();
     if (ret != OMX_ErrorNone) {
-        omx_errorLog("failed to %s::ComponentAllocatePorts(), ret = 0x%08x\n",
+        LOGE("failed to %s::ComponentAllocatePorts(), ret = 0x%08x\n",
              name, ret);
         return ret;
     }
@@ -1843,9 +1827,9 @@ OMX_ERRORTYPE ComponentBase::AllocatePorts(void)
     return OMX_ErrorNone;
 
 free_ports:
-    omx_errorLog("%s(): exit, unknown component variant\n", __func__);
+    LOGE("%s(): exit, unknown component variant\n", __func__);
     FreePorts();
-    return ret;
+    return OMX_ErrorUndefined;
 }
 
 /* called int FreeHandle() */
@@ -1876,46 +1860,76 @@ OMX_ERRORTYPE ComponentBase::FreePorts(void)
 /* implement WorkableInterface */
 void ComponentBase::Work(void)
 {
-    OMX_BUFFERHEADERTYPE *buffers[nr_ports];
+    OMX_BUFFERHEADERTYPE **buffers[nr_ports];
+    OMX_BUFFERHEADERTYPE *buffers_hdr[nr_ports];
+    OMX_BUFFERHEADERTYPE *buffers_org[nr_ports];
     buffer_retain_t retain[nr_ports];
     OMX_U32 i;
     OMX_ERRORTYPE ret;
+
+    if (nr_ports == 0) {
+        return;
+    }
+
+    memset(buffers, 0, sizeof(OMX_BUFFERHEADERTYPE *) * nr_ports);
+    memset(buffers_hdr, 0, sizeof(OMX_BUFFERHEADERTYPE *) * nr_ports);
+    memset(buffers_org, 0, sizeof(OMX_BUFFERHEADERTYPE *) * nr_ports);
 
     pthread_mutex_lock(&ports_block);
 
     while(IsAllBufferAvailable())
     {
         for (i = 0; i < nr_ports; i++) {
-            buffers[i] = ports[i]->PopBuffer();
+            buffers_hdr[i] = ports[i]->PopBuffer();
+            buffers[i] = &buffers_hdr[i];
+            buffers_org[i] = buffers_hdr[i];
             retain[i] = BUFFER_RETAIN_NOT_RETAIN;
         }
 
-        ret = ProcessorProcess(buffers, &retain[0], nr_ports);
+        if (working_role != NULL && !strncmp((char*)working_role, "video_decoder", 13)){
+            ret = ProcessorProcess(buffers, &retain[0], nr_ports);
+        }else{
+            ret = ProcessorProcess(buffers_hdr, &retain[0], nr_ports);
+        }
 
         if (ret == OMX_ErrorNone) {
-            PostProcessBuffers(buffers, &retain[0]);
+            if (!working_role || (strncmp((char*)working_role, "video_encoder", 13) != 0))
+                PostProcessBuffers(buffers, &retain[0]);
 
             for (i = 0; i < nr_ports; i++) {
-                if (retain[i] == BUFFER_RETAIN_GETAGAIN)
-                    ports[i]->RetainThisBuffer(buffers[i], false);
-                else if (retain[i] == BUFFER_RETAIN_ACCUMULATE)
-                    ports[i]->RetainThisBuffer(buffers[i], true);
-                else if (retain[i] == BUFFER_RETAIN_PUSHBACK)
-                    ports[i]->PushThisBuffer(buffers[i]);
-                else
-                    ports[i]->ReturnThisBuffer(buffers[i]);
+                if (buffers_hdr[i] == NULL)
+                    continue;
+
+                if(retain[i] == BUFFER_RETAIN_GETAGAIN) {
+                    ports[i]->RetainThisBuffer(*buffers[i], false);
+                }
+                else if (retain[i] == BUFFER_RETAIN_ACCUMULATE) {
+                    ports[i]->RetainThisBuffer(*buffers[i], true);
+                }
+                else if (retain[i] == BUFFER_RETAIN_OVERRIDDEN) {
+                    ports[i]->RetainAndReturnBuffer(buffers_org[i], *buffers[i]);
+                }
+                else if (retain[i] == BUFFER_RETAIN_CACHE) {
+                    //nothing to do
+                } else {
+                    ports[i]->ReturnThisBuffer(*buffers[i]);
+                }
             }
         }
         else {
-            callbacks.EventHandler(handle, appdata, OMX_EventError, ret,
-                                    0, NULL);
 
             for (i = 0; i < nr_ports; i++) {
+                if (buffers_hdr[i] == NULL)
+                    continue;
+
                 /* return buffers by hands, these buffers're not in queue */
-                ports[i]->ReturnThisBuffer(buffers[i]);
+                ports[i]->ReturnThisBuffer(*buffers[i]);
                 /* flush ports */
                 ports[i]->FlushPort();
             }
+
+            callbacks->EventHandler(handle, appdata, OMX_EventError, ret,
+                                    0, NULL);
         }
     }
 
@@ -1930,8 +1944,10 @@ bool ComponentBase::IsAllBufferAvailable(void)
     for (i = 0; i < nr_ports; i++) {
         OMX_U32 length = 0;
 
-        if (ports[i]->IsEnabled())
-            length = ports[i]->BufferQueueLength();
+        if (ports[i]->IsEnabled()) {
+            length += ports[i]->BufferQueueLength();
+            length += ports[i]->RetainedBufferQueueLength();
+        }
 
         if (length)
             nr_avail++;
@@ -1944,7 +1960,7 @@ bool ComponentBase::IsAllBufferAvailable(void)
 }
 
 inline void ComponentBase::SourcePostProcessBuffers(
-    OMX_BUFFERHEADERTYPE **buffers,
+    OMX_BUFFERHEADERTYPE ***buffers,
     const buffer_retain_t *retain)
 {
     OMX_U32 i;
@@ -1954,14 +1970,13 @@ inline void ComponentBase::SourcePostProcessBuffers(
          * in case of source component, buffers're marked when they come
          * from the ouput ports
          */
-        if (!buffers[i]->hMarkTargetComponent) {
+        if (!(*buffers[i])->hMarkTargetComponent) {
             OMX_MARKTYPE *mark;
 
             mark = ports[i]->PopMark();
             if (mark) {
-                buffers[i]->hMarkTargetComponent =
-                    mark->hMarkTargetComponent;
-                buffers[i]->pMarkData = mark->pMarkData;
+                (*buffers[i])->hMarkTargetComponent = mark->hMarkTargetComponent;
+                (*buffers[i])->pMarkData = mark->pMarkData;
                 free(mark);
             }
         }
@@ -1969,7 +1984,7 @@ inline void ComponentBase::SourcePostProcessBuffers(
 }
 
 inline void ComponentBase::FilterPostProcessBuffers(
-    OMX_BUFFERHEADERTYPE **buffers,
+    OMX_BUFFERHEADERTYPE ***buffers,
     const buffer_retain_t *retain)
 {
     OMX_MARKTYPE *mark;
@@ -1984,8 +1999,8 @@ inline void ComponentBase::FilterPostProcessBuffers(
                 /* propagates EOS flag */
                 /* clear input EOS at the end of this loop */
                 if (retain[i] != BUFFER_RETAIN_GETAGAIN) {
-                    if (buffers[i]->nFlags & OMX_BUFFERFLAG_EOS)
-                        buffers[j]->nFlags |= OMX_BUFFERFLAG_EOS;
+                    if ((*buffers[i])->nFlags & OMX_BUFFERFLAG_EOS)
+                        (*buffers[j])->nFlags |= OMX_BUFFERFLAG_EOS;
                 }
 
                 /* propagates marks */
@@ -1993,61 +2008,64 @@ inline void ComponentBase::FilterPostProcessBuffers(
                  * if hMarkTargetComponent == handle then the mark's not
                  * propagated
                  */
-                if (buffers[i]->hMarkTargetComponent &&
-                    (buffers[i]->hMarkTargetComponent != handle)) {
-                    if (buffers[j]->hMarkTargetComponent) {
+                if ((*buffers[i])->hMarkTargetComponent &&
+                    ((*buffers[i])->hMarkTargetComponent != handle)) {
+                    if ((*buffers[j])->hMarkTargetComponent) {
                         mark = (OMX_MARKTYPE *)malloc(sizeof(*mark));
                         if (mark) {
                             mark->hMarkTargetComponent =
-                                buffers[i]->hMarkTargetComponent;
-                            mark->pMarkData = buffers[i]->pMarkData;
+                                (*buffers[i])->hMarkTargetComponent;
+                            mark->pMarkData = (*buffers[i])->pMarkData;
                             ports[j]->PushMark(mark);
                             mark = NULL;
-                            buffers[i]->hMarkTargetComponent = NULL;
-                            buffers[i]->pMarkData = NULL;
+                            (*buffers[i])->hMarkTargetComponent = NULL;
+                            (*buffers[i])->pMarkData = NULL;
                         }
                     }
                     else {
                         mark = ports[j]->PopMark();
                         if (mark) {
-                            buffers[j]->hMarkTargetComponent =
+                            (*buffers[j])->hMarkTargetComponent =
                                 mark->hMarkTargetComponent;
-                            buffers[j]->pMarkData = mark->pMarkData;
+                            (*buffers[j])->pMarkData = mark->pMarkData;
                             free(mark);
 
                             mark = (OMX_MARKTYPE *)malloc(sizeof(*mark));
                             if (mark) {
                                 mark->hMarkTargetComponent =
-                                    buffers[i]->hMarkTargetComponent;
-                                mark->pMarkData = buffers[i]->pMarkData;
+                                    (*buffers[i])->hMarkTargetComponent;
+                                mark->pMarkData = (*buffers[i])->pMarkData;
                                 ports[j]->PushMark(mark);
                                 mark = NULL;
-                                buffers[i]->hMarkTargetComponent = NULL;
-                                buffers[i]->pMarkData = NULL;
+                                (*buffers[i])->hMarkTargetComponent = NULL;
+                                (*buffers[i])->pMarkData = NULL;
                             }
                         }
                         else {
-                            buffers[j]->hMarkTargetComponent =
-                                buffers[i]->hMarkTargetComponent;
-                            buffers[j]->pMarkData = buffers[i]->pMarkData;
-                            buffers[i]->hMarkTargetComponent = NULL;
-                            buffers[i]->pMarkData = NULL;
+                            (*buffers[j])->hMarkTargetComponent =
+                                (*buffers[i])->hMarkTargetComponent;
+                            (*buffers[j])->pMarkData = (*buffers[i])->pMarkData;
+                            (*buffers[i])->hMarkTargetComponent = NULL;
+                            (*buffers[i])->pMarkData = NULL;
                         }
                     }
                 }
             }
+            /* clear input buffer's EOS */
+            if (retain[i] != BUFFER_RETAIN_GETAGAIN)
+                (*buffers[i])->nFlags &= ~OMX_BUFFERFLAG_EOS;
         }
     }
 }
 
 inline void ComponentBase::SinkPostProcessBuffers(
-    OMX_BUFFERHEADERTYPE **buffers,
+    OMX_BUFFERHEADERTYPE ***buffers,
     const buffer_retain_t *retain)
 {
     return;
 }
 
-void ComponentBase::PostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
+void ComponentBase::PostProcessBuffers(OMX_BUFFERHEADERTYPE ***buffers,
                                        const buffer_retain_t *retain)
 {
 
@@ -2059,13 +2077,13 @@ void ComponentBase::PostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
         SinkPostProcessBuffers(buffers, retain);
     }
     else {
-        omx_errorLog("%s(): fatal error unknown component variant (%d)\n",
+        LOGE("%s(): fatal error unknown component variant (%d)\n",
              __func__, cvariant);
     }
 }
 
 /* processor default callbacks */
-OMX_ERRORTYPE ComponentBase::ProcessorInit(void *parser_handle)
+OMX_ERRORTYPE ComponentBase::ProcessorInit(void)
 {
     return OMX_ErrorNone;
 }
@@ -2078,6 +2096,12 @@ OMX_ERRORTYPE ComponentBase::ProcessorStart(void)
 {
     return OMX_ErrorNone;
 }
+
+OMX_ERRORTYPE ComponentBase::ProcessorReset(void)
+{
+    return OMX_ErrorNone;
+}
+
 
 OMX_ERRORTYPE ComponentBase::ProcessorStop(void)
 {
@@ -2099,26 +2123,36 @@ OMX_ERRORTYPE ComponentBase::ProcessorFlush(OMX_U32 port_index)
     return OMX_ErrorNone;
 }
 
-OMX_ERRORTYPE ComponentBase::ProcessorPreFillBuffer(OMX_BUFFERHEADERTYPE* pBuffer)
+OMX_ERRORTYPE ComponentBase::ProcessorPreFillBuffer(OMX_BUFFERHEADERTYPE* buffer)
 {
     return OMX_ErrorNone;
 }
 
-OMX_ERRORTYPE ComponentBase::ProcessorUseNativeBuffer(OMX_U32 nPortIndex, OMX_BUFFERHEADERTYPE* pBuffer)
+OMX_ERRORTYPE ComponentBase::ProcessorPreEmptyBuffer(OMX_BUFFERHEADERTYPE* buffer)
 {
- return OMX_ErrorNone;
+    return OMX_ErrorNone;
 }
 
-OMX_ERRORTYPE ComponentBase::ProcessorReleaseLock(void)
+OMX_ERRORTYPE ComponentBase::ProcessorProcess(OMX_BUFFERHEADERTYPE **pBuffers,
+                                           buffer_retain_t *retain,
+                                           OMX_U32 nr_buffers)
 {
- return OMX_ErrorNone;
+    LOGE("ProcessorProcess not be implemented");
+    return OMX_ErrorNotImplemented;
+}
+OMX_ERRORTYPE ComponentBase::ProcessorProcess(OMX_BUFFERHEADERTYPE ***pBuffers,
+                                           buffer_retain_t *retain,
+                                           OMX_U32 nr_buffers)
+{
+    LOGE("ProcessorProcess not be implemented");
+    return OMX_ErrorNotImplemented;
 }
 
-OMX_ERRORTYPE ComponentBase::ProcessorEnableNativeBuffers(void)
+OMX_ERRORTYPE ComponentBase::ProcessorPreFreeBuffer(OMX_U32 nPortIndex, OMX_BUFFERHEADERTYPE* pBuffer)
 {
- return OMX_ErrorNone;
-}
+    return OMX_ErrorNone;
 
+}
 /* end of processor callbacks */
 
 /* helper for derived class */
@@ -2131,7 +2165,7 @@ const OMX_COMPONENTTYPE *ComponentBase::GetComponentHandle(void)
 {
     return handle;
 }
-
+#if 0
 void ComponentBase::DumpBuffer(const OMX_BUFFERHEADERTYPE *bufferheader,
                                bool dumpdata)
 {
@@ -2145,18 +2179,18 @@ void ComponentBase::DumpBuffer(const OMX_BUFFERHEADERTYPE *bufferheader,
     char prbuffer[8 + 3 * 0x10 + 2], *pp;
     OMX_U32 prbuffer_len;
 
-    omx_debugLog("Component %s DumpBuffer\n", name);
-    omx_debugLog("%s port index = %lu",
+    LOGD("Component %s DumpBuffer\n", name);
+    LOGD("%s port index = %lu",
          (bufferheader->nInputPortIndex != 0x7fffffff) ? "input" : "output",
          (bufferheader->nInputPortIndex != 0x7fffffff) ?
          bufferheader->nInputPortIndex : bufferheader->nOutputPortIndex);
-    omx_debugLog("nAllocLen = %lu, nOffset = %lu, nFilledLen = %lu\n",
+    LOGD("nAllocLen = %lu, nOffset = %lu, nFilledLen = %lu\n",
          alloc_len, offset, filled_len);
-    omx_debugLog("nTimeStamp = %lld, nTickCount = %lu",
+    LOGD("nTimeStamp = %lld, nTickCount = %lu",
          bufferheader->nTimeStamp,
          bufferheader->nTickCount);
-    omx_debugLog("nFlags = 0x%08lx\n", bufferheader->nFlags);
-    omx_debugLog("hMarkTargetComponent = %p, pMarkData = %p\n",
+    LOGD("nFlags = 0x%08lx\n", bufferheader->nFlags);
+    LOGD("hMarkTargetComponent = %p, pMarkData = %p\n",
          bufferheader->hMarkTargetComponent, bufferheader->pMarkData);
 
     if (!pbuffer || !alloc_len || !filled_len)
@@ -2182,10 +2216,10 @@ void ComponentBase::DumpBuffer(const OMX_BUFFERHEADERTYPE *bufferheader,
         left -= oneline;
 
         pp = &prbuffer[0];
-        omx_debugLog("%s", pp);
+        LOGD("%s", pp);
     }
 }
-
+#endif
 /* end of component methods & helpers */
 
 /*

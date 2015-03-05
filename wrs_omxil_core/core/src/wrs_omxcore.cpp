@@ -29,117 +29,55 @@
 #include <cmodule.h>
 #include <componentbase.h>
 
-#define NUM_COMPONENTS 3
-typedef struct component_handle {
+//#define LOG_NDEBUG 0
 
-    char comp_name[OMX_MAX_STRINGNAME_SIZE];
-    void * comp_handle;
-    char parser_name[OMX_MAX_STRINGNAME_SIZE];
-    void * parser_handle;
-
-}ComponentHandle, *ComponentHandlePtr;
+#define LOG_TAG "wrs-omxil-core"
+#include <log.h>
 
 static unsigned int g_initialized = 0;
 static unsigned int g_nr_instances = 0;
-static struct list *preload_list=NULL;
 
 static struct list *g_module_list = NULL;
 static pthread_mutex_t g_module_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static char *omx_components[NUM_COMPONENTS][2] = {
-    {"libOMXVideoDecoderAVC.so", "libmixvbp-h264.so"},
-    {"libOMXVideoEncoderAVC.so", NULL},
-    {NULL,NULL}
-};
-
-extern "C" bool preload_components(void)
-{
-    /* this function is called by openMAX-IL client when libraries are to be
-     * loaded at initial stages.  Security features of the operating system require
-     * to load libraries upfront */
-    ComponentHandlePtr component_handle;
-    int index;
-    bool ret = true;
-
-    for (index=0;omx_components[index][0];index++) {
-        struct list *entry;
-        component_handle = (ComponentHandlePtr) malloc(sizeof(ComponentHandle));
-
-        strncpy(component_handle->comp_name, omx_components[index][0], OMX_MAX_STRINGNAME_SIZE);
-        /* parser is not always needed */
-        if (omx_components[index][1])
-            strncpy(component_handle->parser_name, omx_components[index][1], OMX_MAX_STRINGNAME_SIZE);
-
-        /* skip libraries starting with # */
-        if (component_handle->comp_name[0] == '#')
-            continue;
-
-        component_handle->comp_handle = dlopen(component_handle->comp_name, RTLD_NOW);
-        if (!component_handle->comp_handle) {
-            ret=false;
-            goto delete_comphandle;
-        }
-
-
-        if (component_handle->parser_name) {
-            /* some components don't need a parser */
-            component_handle->parser_handle = dlopen(component_handle->parser_name, RTLD_NOW);
-            if (!component_handle->parser_handle) {
-                ret=false;
-                goto delete_comphandle;
-            }
-        }
-
-        entry = list_alloc(component_handle);
-        if (!entry) {
-            ret=false;
-            goto unload_comphandle;
-        }
-        preload_list = __list_add_tail(preload_list, entry);
-
-	omx_infoLog("open component %s and parser %s", component_handle->comp_name,
-			component_handle->parser_name == NULL ?
-			"No parser provided":component_handle->parser_name );
-	continue;
-
-unload_comphandle:
-        dlclose(component_handle->comp_handle);
-delete_comphandle:
-        free(component_handle);
-    }
-    return ret;
-}
-
 static struct list *construct_components(const char *config_file_name)
 {
     FILE *config_file;
+    char library_name[OMX_MAX_STRINGNAME_SIZE];
     char config_file_path[256];
-    int index=0;
-    struct list *head = NULL, *preload_entry;
-    ComponentHandlePtr component_handle;
+    struct list *head = NULL;
 
-    list_foreach(preload_list, preload_entry) {
+    strncpy(config_file_path, "/etc/", 256);
+    strncat(config_file_path, config_file_name, 256);
+    config_file = fopen(config_file_path, "r");
+    if (!config_file) {
+        strncpy(config_file_path, "./", 256);
+        strncat(config_file_path, config_file_name, 256);
+        config_file = fopen(config_file_path, "r");
+        if (!config_file) {
+            LOGE("not found file %s\n", config_file_name);
+            return NULL;
+        }
+    }
+
+    while (fscanf(config_file, "%s", library_name) > 0) {
         CModule *cmodule;
         struct list *entry;
         OMX_ERRORTYPE ret;
 
-        component_handle = (ComponentHandlePtr) preload_entry->data;
+        library_name[OMX_MAX_STRINGNAME_SIZE-1] = '\0';
 
         /* skip libraries starting with # */
-        if (component_handle->comp_name[0] == '#')
+        if (library_name[0] == '#')
             continue;
 
-        cmodule = new CModule(component_handle->comp_name);
+        cmodule = new CModule(&library_name[0]);
         if (!cmodule)
             continue;
 
-        omx_verboseLog("found component library %s", component_handle->comp_name);
+        LOGI("found component library %s\n", library_name);
 
-        ret = cmodule->Load(MODULE_NOW, component_handle->comp_handle);
-        if (ret != OMX_ErrorNone)
-            goto delete_cmodule;
-
-        ret = cmodule->SetParser(component_handle->parser_handle);
+        ret = cmodule->Load(MODULE_LAZY);
         if (ret != OMX_ErrorNone)
             goto delete_cmodule;
 
@@ -152,8 +90,8 @@ static struct list *construct_components(const char *config_file_name)
             goto unload_cmodule;
         head = __list_add_tail(head, entry);
 
-        // cmodule->Unload();
-        omx_verboseLog("module %s:%s added to component list",
+        cmodule->Unload();
+        LOGI("module %s:%s added to component list\n",
              cmodule->GetLibraryName(), cmodule->GetComponentName());
 
         continue;
@@ -164,13 +102,13 @@ static struct list *construct_components(const char *config_file_name)
         delete cmodule;
     }
 
+    fclose(config_file);
     return head;
 }
 
 static struct list *destruct_components(struct list *head)
 {
     struct list *entry, *next;
-    ComponentHandlePtr component_handle;
 
     list_foreach_safe(head, entry, next) {
         CModule *cmodule = static_cast<CModule *>(entry->data);
@@ -186,14 +124,14 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_Init(void)
 {
     int ret;
 
-    omx_verboseLog("%s(): enter", __FUNCTION__);
+    LOGV("%s(): enter", __FUNCTION__);
 
     pthread_mutex_lock(&g_module_lock);
     if (!g_initialized) {
         g_module_list = construct_components("wrs_omxil_components.list");
         if (!g_module_list) {
             pthread_mutex_unlock(&g_module_lock);
-            omx_errorLog("%s(): exit failure, construct_components failed",
+            LOGE("%s(): exit failure, construct_components failed",
                  __FUNCTION__);
             return OMX_ErrorInsufficientResources;
         }
@@ -202,7 +140,7 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_Init(void)
     }
     pthread_mutex_unlock(&g_module_lock);
 
-    omx_verboseLog("%s(): exit done", __FUNCTION__);
+    LOGV("%s(): exit done", __FUNCTION__);
     return OMX_ErrorNone;
 }
 
@@ -210,17 +148,18 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_Deinit(void)
 {
     OMX_ERRORTYPE ret = OMX_ErrorNone;
 
-    omx_verboseLog("%s(): enter", __FUNCTION__);
+    LOGV("%s(): enter", __FUNCTION__);
 
     pthread_mutex_lock(&g_module_lock);
-    if (!g_nr_instances) {
+    if (!g_nr_instances)
         g_module_list = destruct_components(g_module_list);
-        g_initialized = 0;
-    } else
+    else
         ret = OMX_ErrorUndefined;
     pthread_mutex_unlock(&g_module_lock);
 
-    omx_verboseLog("%s(): exit done (ret : 0x%08x)", __FUNCTION__, ret);
+    g_initialized = 0;
+
+    LOGV("%s(): exit done (ret : 0x%08x)", __FUNCTION__, ret);
     return ret;
 }
 
@@ -247,7 +186,7 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_ComponentNameEnum(
 
     strncpy(cComponentName, cname, nNameLength);
 
-    omx_verboseLog("%s(): found %luth component %s", __FUNCTION__, nIndex, cname);
+    LOGV("%s(): found %luth component %s", __FUNCTION__, nIndex, cname);
     return OMX_ErrorNone;
 }
 
@@ -260,7 +199,7 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_GetHandle(
     struct list *entry;
     OMX_ERRORTYPE ret;
 
-    omx_verboseLog("%s(): enter, try to get %s", __FUNCTION__, cComponentName);
+    LOGV("%s(): enter, try to get %s", __FUNCTION__, cComponentName);
 
     pthread_mutex_lock(&g_module_lock);
     list_foreach(g_module_list, entry) {
@@ -273,16 +212,23 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_GetHandle(
         if (!strcmp(cComponentName, cname)) {
             ComponentBase *cbase = NULL;
 
+            ret = cmodule->Load(MODULE_NOW);
+            if (ret != OMX_ErrorNone) {
+                LOGE("%s(): exit failure, cmodule->Load failed\n",
+                     __FUNCTION__);
+                goto unlock_list;
+            }
+
             ret = cmodule->InstantiateComponent(&cbase);
             if (ret != OMX_ErrorNone){
-                omx_errorLog("%s(): exit failure, cmodule->Instantiate failed\n",
+                LOGE("%s(): exit failure, cmodule->Instantiate failed\n",
                      __FUNCTION__);
                 goto unload_cmodule;
             }
 
             ret = cbase->GetHandle(pHandle, pAppData, pCallBacks);
             if (ret != OMX_ErrorNone) {
-                omx_errorLog("%s(): exit failure, cbase->GetHandle failed\n",
+                LOGE("%s(): exit failure, cbase->GetHandle failed\n",
                      __FUNCTION__);
                 goto delete_cbase;
             }
@@ -292,8 +238,8 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_GetHandle(
             g_nr_instances++;
             pthread_mutex_unlock(&g_module_lock);
 
-            omx_infoLog("get handle of component %s successfully", cComponentName);
-            omx_verboseLog("%s(): exit done\n", __FUNCTION__);
+            LOGI("get handle of component %s successfully", cComponentName);
+            LOGV("%s(): exit done\n", __FUNCTION__);
             return OMX_ErrorNone;
 
         delete_cbase:
@@ -303,13 +249,13 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_GetHandle(
         unlock_list:
             pthread_mutex_unlock(&g_module_lock);
 
-            omx_errorLog("%s(): exit failure, (ret : 0x%08x)\n", __FUNCTION__, ret);
+            LOGE("%s(): exit failure, (ret : 0x%08x)\n", __FUNCTION__, ret);
             return ret;
         }
     }
     pthread_mutex_unlock(&g_module_lock);
 
-    omx_errorLog("%s(): exit failure, %s not found", __FUNCTION__, cComponentName);
+    LOGE("%s(): exit failure, %s not found", __FUNCTION__, cComponentName);
     return OMX_ErrorInvalidComponent;
 }
 
@@ -327,18 +273,18 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_FreeHandle(
     cbase = static_cast<ComponentBase *>
         (((OMX_COMPONENTTYPE *)hComponent)->pComponentPrivate);
     if (!cbase) {
-        omx_errorLog("%s(): exit failure, cannot find cbase pointer\n",
+        LOGE("%s(): exit failure, cannot find cbase pointer\n",
              __FUNCTION__);
         return OMX_ErrorBadParameter;
     }
     strcpy(&cname[0], cbase->GetName());
 
-    omx_verboseLog("%s(): enter, try to free %s", __FUNCTION__, cbase->GetName());
+    LOGV("%s(): enter, try to free %s", __FUNCTION__, cbase->GetName());
 
 
     ret = cbase->FreeHandle(hComponent);
     if (ret != OMX_ErrorNone) {
-        omx_errorLog("%s(): exit failure, cbase->FreeHandle() failed (ret = 0x%08x)\n",
+        LOGE("%s(): exit failure, cbase->FreeHandle() failed (ret = 0x%08x)\n",
              __FUNCTION__, ret);
         return ret;
     }
@@ -349,16 +295,15 @@ OMX_API OMX_ERRORTYPE OMX_APIENTRY OMX_FreeHandle(
 
     cmodule = cbase->GetCModule();
     if (!cmodule)
-        omx_errorLog("fatal error, %s does not have cmodule\n", cbase->GetName());
-
-
-    if (cmodule && !preload_list)
-        cmodule->Unload();
+        LOGE("fatal error, %s does not have cmodule\n", cbase->GetName());
 
     delete cbase;
 
-    omx_infoLog("free handle of component %s successfully", cname);
-    omx_verboseLog("%s(): exit done", __FUNCTION__);
+    if (cmodule)
+        cmodule->Unload();
+
+    LOGI("free handle of component %s successfully", cname);
+    LOGV("%s(): exit done", __FUNCTION__);
     return OMX_ErrorNone;
 }
 
@@ -401,7 +346,7 @@ OMX_API OMX_ERRORTYPE OMX_GetComponentsOfRole (
                 strncpy((OMX_STRING)&compNames[nr_comps][0], cname,
                         OMX_MAX_STRINGNAME_SIZE);
                 copied_nr_comps++;
-                omx_verboseLog("%s(): component %s has %s role", __FUNCTION__,
+                LOGV("%s(): component %s has %s role", __FUNCTION__,
                      cname, role);
             }
             nr_comps++;
@@ -446,7 +391,7 @@ OMX_API OMX_ERRORTYPE OMX_GetRolesOfComponent (
                 OMX_U32 i;
 
                 for (i = 0; i < *pNumRoles; i++) {
-                    omx_verboseLog("%s(): component %s has %s role", __FUNCTION__,
+                    LOGV("%s(): component %s has %s role", __FUNCTION__,
                          compName, &roles[i][0]);
                 }
             }

@@ -17,6 +17,7 @@
  */
 
 #include <workqueue.h>
+#include <sys/prctl.h>
 
 WorkQueue::WorkQueue()
 {
@@ -49,6 +50,9 @@ int WorkQueue::StartWork(bool executing)
 {
     this->executing = executing;
 
+    pthread_mutex_lock(&wlock);
+    stop = false;
+    pthread_mutex_unlock(&wlock);
     return Start();
 }
 
@@ -100,8 +104,14 @@ void WorkQueue::ResumeWork(void)
 
 void WorkQueue::Run(void)
 {
-    while (!stop) {
+    prctl(PR_SET_NAME, (unsigned long)"IntelHwCodec", 0, 0, 0);
+
+    while (true) {
         pthread_mutex_lock(&wlock);
+        if (stop) {
+            pthread_mutex_unlock(&wlock);
+            break;
+        }
 
         if (!works) {
             pthread_mutex_lock(&executing_lock);

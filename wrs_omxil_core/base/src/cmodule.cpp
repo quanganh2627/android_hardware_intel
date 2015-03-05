@@ -25,6 +25,9 @@
 #include <cmodule.h>
 #include <componentbase.h>
 
+#define LOG_TAG "cmodule"
+#include <log.h>
+
 /*
  * constructor / deconstructor
  */
@@ -35,12 +38,12 @@ CModule::CModule(const OMX_STRING lname)
 
     roles = NULL;
     nr_roles = 0;
-    preload_libraries=0;
 
     memset(cname, 0, OMX_MAX_STRINGNAME_SIZE);
 
     memset(this->lname, 0, OMX_MAX_STRINGNAME_SIZE);
-    strncpy(this->lname, lname, OMX_MAX_STRINGNAME_SIZE);
+   // strncpy(this->name, name, OMX_MAX_STRINGNAME_SIZE);
+    strncpy(this->lname, lname, (strlen(lname) < OMX_MAX_STRINGNAME_SIZE) ? strlen(lname) : (OMX_MAX_STRINGNAME_SIZE-1));
     this->lname[OMX_MAX_STRINGNAME_SIZE-1] = '\0';
 }
 
@@ -64,16 +67,13 @@ CModule::~CModule()
 /*
  * library loading / unloading
  */
-OMX_ERRORTYPE CModule::Load(int flag, void *preload)
+OMX_ERRORTYPE CModule::Load(int flag)
 {
     struct module *m;
 
-    if (preload) {
-        preload_libraries=1;
-    }
-    m = module_open(lname, flag, preload);
+    m = module_open(lname, flag);
     if (!m) {
-        omx_errorLog("module not founded (%s)", lname);
+        LOGE("module not founded (%s)\n", lname);
         return OMX_ErrorComponentNotFound;
     }
 
@@ -83,15 +83,17 @@ OMX_ERRORTYPE CModule::Load(int flag, void *preload)
     wrs_omxil_cmodule = (struct wrs_omxil_cmodule_s *)
         module_symbol(m, WRS_OMXIL_CMODULE_SYMBOL_STRING);
     if (!wrs_omxil_cmodule) {
-        omx_errorLog("module %s symbol not founded (%s)",
+        LOGE("module %s symbol not founded (%s)\n",
              lname, WRS_OMXIL_CMODULE_SYMBOL_STRING);
 
-        module_close(m, preload_libraries);
+        module_close(m);
         return OMX_ErrorInvalidComponent;
     }
 
+    if (module)
+        LOGE("module %s will be overwrite",module->name);
     module = m;
-    omx_infoLog("module %s successfully loaded", lname);
+    LOGI("module %s successfully loaded\n", lname);
 
     return OMX_ErrorNone;
 }
@@ -100,12 +102,12 @@ OMX_U32 CModule::Unload(void)
 {
     int ref_count;
 
-    ref_count = module_close(module, preload_libraries);
+    ref_count = module_close(module);
     if (!ref_count) {
         module = NULL;
         wrs_omxil_cmodule = NULL;
 
-        omx_infoLog("module %s successfully unloaded", lname);
+        LOGI("module %s successfully unloaded\n", lname);
     }
 
     return ref_count;
@@ -190,7 +192,7 @@ OMX_ERRORTYPE CModule::InstantiateComponent(ComponentBase **instance)
 
     ret = wrs_omxil_cmodule->ops->instantiate((void **)&cbase);
     if (ret != OMX_ErrorNone) {
-        omx_errorLog("%s failed to instantiate()\n", lname);
+        LOGE("%s failed to instantiate()\n", lname);
         return ret;
     }
 
@@ -265,17 +267,6 @@ OMX_ERRORTYPE CModule::QueryComponentNameAndRoles(void)
     cname[copy_name_len] = '\0';
 
     return OMX_ErrorNone;
-}
-
-OMX_ERRORTYPE CModule::SetParser(void* parser_handle)
-{
-    this->parser_handle = parser_handle;
-    return OMX_ErrorNone;
-}
-
-void * CModule::GetParser (void)
-{
-    return this->parser_handle;
 }
 
 /* end of library symbol method and helpers */

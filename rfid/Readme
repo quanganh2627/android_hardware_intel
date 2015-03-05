@@ -1,0 +1,37 @@
+RFID app and native service introduction and usage:
+
+
+1 The app work flow:
+  IPtrak app(or monzax_app) -> JNI lib --|--> native service lib(operate the device node here) --|--> monzax driver
+2 For native service support:
+  There are 2 file of the native service feature, one is "libmonzax_service.so", the other is binary named as "rfid_monzaxd"
+3 For kernel/bootimg which include the monzax driver, it needs the bootimg included the monzax driver by default.
+  If it is not in the weekly release, needs to provide it locally.
+4 For RFID app, it included the JNI lib.
+  Because of native service added, the jni part also have changed, there is one patch for it.
+
+I) How to add native service for test?
+
+You can follow below cmds:
+1) adb remount
+
+# push service file into ffrd8 platform
+2) adb push libmonzax_service.so /system/lib
+3) adb push rfid_monzaxd /system/bin
+
+# push jni lib and test app into ffrd8 platform
+4) adb push libmonzax_jni.so /system/lib
+5) adb push monzax_app /system/bin
+
+# sync file system and reboot
+6) adb shell sync
+7) adb shell reboot
+
+II) How to change bootimg if needed?
+
+1) adb reboot bootloader
+#after ffrd8 board go into fastboot mode, there is logo in screen.
+2) fastboot flash boot boot.img
+3) fastboot reboot
+
+

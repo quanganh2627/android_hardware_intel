@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<devices>
+    <device name="Unipoint HID"/>
+    <device name="RMI4 Unipoint"/>
+</devices>

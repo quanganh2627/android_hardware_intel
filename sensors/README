@@ -1,0 +1,206 @@
+Sensor HAL config file instruction
+
+Summary
+---------
+
+Sensor HAL needs a xml file to config platform specific data and information, and the xml file
+MUST be in directory /system/etc/. By default, sensor HAL uses xml file named
+"sensor_hal_config_default.xml" (in /system/etc/). If the system property "ro.sensors.mapper" is
+set to "scale-pr1" (which means if we run command "getprop ro.sensors.mapper" in adb shell, we
+should get "scale-pr1"), sensor HAL will use file named "sensor_hal_config_scale-pr1.xml"
+(in /system/etc/). In fact, the name is extendable, if the system property "ro.sensors.mapper"
+is set to "user-defined-name", sensor HAL will use xml file named
+"sensor_hal_config_user-defined-name.xml" in /system/etc/.
+
+Description
+-------------
+
+The xml file MUST have a root element named "sensor_hal_config", and this name should never be
+changed. The children element under the root element should be the name of sensor. Currently,
+sensor HAL ONLY supports the names below:
+    accelerometer
+    light
+    proximity
+    compass
+    gyroscope
+    pressure
+    ambient_temperature
+The sensor types and handles will be determined by these names.
+
+Each sensor should have two children elements: <platform_config> and <sensor>
+<platform_config> includes config information related to the sensor and should have the children
+elements below:
+    name:           most sensor drivers use input device(/dev/input/eventX) to report data, this
+                    element's value should be the name of the input device;
+    activate_path:  the interface to activate(enable) sensor in driver;
+    poll_path:      if have, it should be the setDelay interface in driver;
+    data_path:      if have, this sensor driver interface should accept data for calibration;
+    config_path:    if have, this is a file which stores userspace config data;
+    mapper:         if the sensor device's coordinate system is different from the Android sensor
+                    coordinate system, we should map the device axis to android axis. the property
+                    name "axis_x"/"axis_y"/"axis_z" should be the device's axis, and its value
+                    "X"/"Y"/"Z" is the android axis it maps to;
+    scale:          the value scale and/or the direction opposing, the raw data from driver will be
+                    multiplied by this value (note: the property name "axis_x"/"axis_y"/"axis_z"
+                    should be the device's axis);
+    range:          if have, it should be the minimum and maximum value of the sensor data;
+    min_delay:      minimum delay allowed between events in microseconds. A value of zero means that
+                    this sensor doesn't report events at a constant rate, but rather only when a new
+                    data is available;
+    priv_data:      if have, it should be the specify data for the sensor;
+
+<sensor> is for setting the "struct sensor_t" defined in hardware/libhardware/include/hardware/sensors.h,
+its children elements are:
+    name:           name of this sensors;
+    vendor:         vendor of the hardware part;
+    version:        version of the hardware part + driver. The value of this field must increase when
+                    the driver is updated in a way that changes the output of this sensor. This is
+                    important for fused sensors when the fusion algorithm is updated;
+    maxRange:       maximaum range of this sensor's value in SI units (the final value will be the
+                    value multiply the unit(e.g. M_PI=3.14, GRAVITY_EARTH=9.82 , etc.));
+    resolution:     smallest difference between two values reported by this sensor;
+    power:          rough estimate of this sensor's power consumption in mA;
+    minDelay:       minimum delay allowed between events in microseconds. A value of zero means that
+                    this sensor doesn't report events at a constant rate, but rather only when a new
+                    data is available;
+
+An XML sample
+----------------
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<sensor_hal_config>
+  <accelerometer>
+    <platform_config>
+      <name>accel</name>
+      <activate_path>/sys/bus/i2c/devices/5-0019/lis3dh/enable</activate_path>
+      <poll_path>/sys/bus/i2c/devices/5-0019/lis3dh/poll</poll_path>
+      <data_path></data_path>
+      <config_path></config_path>
+      <mapper axis_x="Y" axis_y="X" axis_z="Z"></mapper>
+      <scale axis_x="-1.0" axis_y="-1.0" axis_z="1.0"></scale>
+      <range min="0" max="0"></range>
+      <min_delay>0</min_delay>
+    </platform_config>
+    <sensor>
+      <name>MODEL_LSM303DLHC 3-axis Accelerometer</name>
+      <vendor>STMicroelectronics</vendor>
+      <version>1</version>
+      <maxRange unit="GRAVITY_EARTH">2</maxRange>
+      <resolution unit="GRAVITY_EARTH">0.001</resolution>
+      <power>0.11</power>
+      <minDelay>10000</minDelay>
+    </sensor>
+  </accelerometer>
+  <light>
+    <platform_config>
+      <name>light</name>
+      <activate_path>/dev/apds990x_lsensor</activate_path>
+      <poll_path></poll_path>
+      <data_path>/dev/apds990x_lsensor</data_path>
+      <config_path></config_path>
+      <mapper axis_x="X" axis_y="Y" axis_z="Z"></mapper>
+      <scale axis_x="1.0" axis_y="1.0" axis_z="1.0"></scale>
+      <range min="0" max="10000.0"></range>
+      <min_delay>0</min_delay>
+    </platform_config>
+    <sensor>
+      <name>Avago APDS-9900 Digital Ambient Light Sensor</name>
+      <vendor>Avago</vendor>
+      <version>1</version>
+      <maxRange>10000.0</maxRange>
+      <resolution>0.1</resolution>
+      <power>0.25</power>
+      <minDelay>0</minDelay>
+    </sensor>
+  </light>
+  <proximity>
+    <platform_config>
+      <name>proximity</name>
+      <activate_path>/dev/apds990x_psensor</activate_path>
+      <poll_path>0</poll_path>
+      <data_path>/sys/bus/i2c/devices/5-0039/prox0_raw</data_path>
+      <config_path>/sys/bus/i2c/devices/5-0039/prox0_thresh_above_value</config_path>
+      <mapper axis_x="X" axis_y="Y" axis_z="Z"></mapper>
+      <scale axis_x="1.0" axis_y="1.0" axis_z="1.0"></scale>
+      <range min="0" max="0"></range>
+      <min_delay>0</min_delay>
+    </platform_config>
+    <sensor>
+      <name>Avago APDS-9900 Digital Proximity Sensor</name>
+      <vendor>Avago</vendor>
+      <version>1</version>
+      <maxRange>6.0</maxRange>
+      <resolution>6.0</resolution>
+      <power>0.25</power>
+      <minDelay>0</minDelay>
+    </sensor>
+  </proximity>
+  <compass>
+    <platform_config>
+      <name>lsm303cmp</name>
+      <activate_path>/sys/bus/i2c/devices/5-001e/lsm303cmp/enable</activate_path>
+      <poll_path>/sys/bus/i2c/devices/5-001e/lsm303cmp/poll</poll_path>
+      <data_path></data_path>
+      <config_path>/data/compass.conf</config_path>
+      <mapper axis_x="Y" axis_y="X" axis_z="Z"></mapper>
+      <scale axis_x="670.0" axis_y="670.0" axis_z="-600.0"></scale>
+      <range min="0" max="0"></range>
+      <min_delay>0</min_delay>
+      <priv_data compass_filter_en="1"></priv_data>
+    </platform_config>
+    <sensor>
+      <name>MODEL_LSM303DLHC 3-axis Magnetic field sensor</name>
+      <vendor>STMicroelectronics</vendor>
+      <version>1</version>
+      <maxRange>250.0</maxRange>
+      <resolution>0.15</resolution>
+      <power>0.1</power>
+      <minDelay>20000</minDelay>
+    </sensor>
+  </compass>
+  <gyroscope>
+    <platform_config>
+      <name>l3g4200d</name>
+      <activate_path>/sys/bus/i2c/devices/5-0068/enable;/sys/bus/i2c/devices/5-006a/enable</activate_path>
+      <poll_path>/sys/bus/i2c/devices/5-0068/poll;/sys/bus/i2c/devices/5-006a/poll</poll_path>
+      <data_path></data_path>
+      <config_path>/data/gyro.conf</config_path>
+      <mapper axis_x="X" axis_y="Y" axis_z="Z"></mapper>
+      <scale axis_x="1.0" axis_y="1.0" axis_z="1.0"></scale>
+      <range min="0" max="0"></range>
+      <min_delay>10000000</min_delay>
+    </platform_config>
+    <sensor>
+      <name>L3G4200D Gyroscope sensor</name>
+      <vendor>STMicroelectronics</vendor>
+      <version>1</version>
+      <maxRange unit="M_PI">11.111111</maxRange>         <!-- 2000/180 -->
+      <resolution unit="M_PI">0.000388889</resolution>   <!-- 70/1000/180 -->
+      <power>6.1</power>
+      <minDelay>10000</minDelay>
+    </sensor>
+  </gyroscope>
+  <pressure>
+    <platform_config>
+      <name>lps331ap_pressure</name>
+      <activate_path>/sys/bus/i2c/devices/5-005c/enable</activate_path>
+      <poll_path>/sys/bus/i2c/devices/5-005c/poll</poll_path>
+      <data_path></data_path>
+      <config_path></config_path>
+      <mapper axis_x="X" axis_y="Y" axis_z="Z"></mapper>
+      <scale  axis_x="1.0" axis_y="1.0" axis_z="1.0"></scale>
+      <range min="0" max="0"></range>
+      <min_delay>0</min_delay>
+    </platform_config>
+    <sensor>
+      <name>ST LPS331AP Pressure Sensor</name>
+      <vendor>STMicroelectronics</vendor>
+      <version>1</version>
+      <maxRange>1260.0</maxRange>
+      <resolution>0.24</resolution>
+      <power>0.001</power>
+      <minDelay>50000</minDelay>
+    </sensor>
+  </pressure>
+</sensor_hal_config>

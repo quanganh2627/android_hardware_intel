@@ -25,6 +25,9 @@
 #include <componentbase.h>
 #include <portother.h>
 
+#define LOG_TAG "portother"
+#include <log.h>
+
 PortOther::PortOther()
 {
     memset(&otherparam, 0, sizeof(otherparam));

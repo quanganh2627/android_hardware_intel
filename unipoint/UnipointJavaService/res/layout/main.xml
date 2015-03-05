@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    >
+<TextView  
+    android:layout_width="fill_parent" 
+    android:layout_height="wrap_content" 
+    android:text="@string/hello"
+    />
+<Button android:layout_width="fill_parent" 
+    android:layout_height="wrap_content" 
+    android:id="@+id/unipointonoffswitch" 
+    android:text="@string/disableunipoint">
+ </Button>
+    
+<TextView  
+	
+    android:layout_width="fill_parent" 
+    android:layout_height="wrap_content" 
+    android:id="@+id/informationtext"
+    />
+<Button     
+ 	android:id="@+id/getmodebutton"
+	android:layout_width="fill_parent" 
+    android:layout_height="wrap_content"
+    android:text="@string/getcurrentmode" ></Button>
+
+    
+<Button     
+ 	android:id="@+id/changemodebutton1"
+	android:layout_width="fill_parent" 
+    android:layout_height="wrap_content"
+    android:text="@string/switchtomode_volume" ></Button>
+
+
+    
+<Button android:layout_width="fill_parent" 
+	android:layout_height="wrap_content" 
+	android:id="@+id/changemodebutton" 
+	android:text="@string/switchtomode_normal"></Button>
+<Button android:layout_width="fill_parent" 
+	android:layout_height="wrap_content" 
+	android:id="@+id/reconnecttodaemon" 
+	android:text="@string/restartservice"></Button>
+
+</LinearLayout>

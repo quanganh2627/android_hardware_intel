@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hello">Hello, This is Unipoint API example Application</string>
+    <string name="app_name">Unipoint API Example</string>
+    <string name="getcurrentmode">Get Current Mode</string>
+     <string name="switchtonextmode">Switch To Next Mode</string>
+</resources>

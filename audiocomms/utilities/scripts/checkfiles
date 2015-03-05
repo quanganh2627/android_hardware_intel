@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# INTEL CONFIDENTIAL
+# Copyright © 2013 Intel
+# Corporation All Rights Reserved.
+#
+# The source code contained or described herein and all documents related to
+# the source code ("Material") are owned by Intel Corporation or its suppliers
+# or licensors. Title to the Material remains with Intel Corporation or its
+# suppliers and licensors. The Material contains trade secrets and proprietary
+# and confidential information of Intel or its suppliers and licensors. The
+# Material is protected by worldwide copyright and trade secret laws and
+# treaty provisions. No part of the Material may be used, copied, reproduced,
+# modified, published, uploaded, posted, transmitted, distributed, or
+# disclosed in any way without Intel’s prior express written permission.
+#
+# No license under any patent, copyright, trade secret or other intellectual
+# property right is granted to or conferred upon you by disclosure or delivery
+# of the Materials, either expressly, by implication, inducement, estoppel or
+# otherwise. Any license under such intellectual property rights must be
+# express and approved by Intel in writing.
+#
+#
+# That scripts search for AudioComms checkfiles script and runs it
+#
+
+#set -x
+
+AUDIOCOMMS_TEST_GIT_PRJ="a/bsp/hardware/intel/PRIVATE/audiocomms_tests"
+AUDIOCOMMS_CHECKFILE="code_quality/checkfiles"
+CUR_PATH="."
+
+# Get quality scripts git project path
+AUDIOCOMMS_TEST_GIT_PATH=$(repo list $AUDIOCOMMS_TEST_GIT_PRJ | cut --delimiter ' ' --field 1)
+
+# Search for the .repo directory
+while [ "$(readlink --canonicalize "$CUR_PATH")" != "/" ]
+do
+    REPO_PATH=$(find -L "$CUR_PATH" -maxdepth 1 -mindepth 1 -type d -name .repo)
+    if [ "$REPO_PATH" ]
+    then
+        # Execute AudioComms FT generic checkfiles script
+        $REPO_PATH/../$AUDIOCOMMS_TEST_GIT_PATH/$AUDIOCOMMS_CHECKFILE
+        break
+    fi
+
+    CUR_PATH="$CUR_PATH/.."
+done

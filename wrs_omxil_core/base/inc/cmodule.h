@@ -20,7 +20,6 @@
 #define __CMODULE_H
 
 #include <module.h>
-#include <sysdeps.h>
 
 /*
  * WRS OMX-IL Component Module Symbol
@@ -51,9 +50,7 @@ class CModule {
     /*
      * library loading / unloading
      */
-    OMX_ERRORTYPE Load(int flag, void *preload);
-    OMX_ERRORTYPE SetParser(void * parser_handle);
-    void * GetParser(void);
+    OMX_ERRORTYPE Load(int flag);
     OMX_U32 Unload(void);
 
     /* end of library loading / unloading */
@@ -97,10 +94,6 @@ class CModule {
     char lname[OMX_MAX_STRINGNAME_SIZE];
     /* utils::module */
     struct module *module;
-    /* preload: parser */
-    void * parser_handle;
-    /* preload: using preload libraries*/
-    OMX_U32 preload_libraries;
 };
 
 #endif /* __CMODULE_H */

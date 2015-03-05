@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hello">Hello, Unipoint User</string>
+    <string name="app_name">Unipoint</string>
+    <string name="getcurrentmode">Get Current Mode</string>
+    <string name="switchtomode_normal">Switch To Normal Mode</string>
+    <string name="switchtomode_volume">Switch To Volume Mode</string>
+    <string name="restartservice">Reconnect To Unipoint Daemon</string>
+    <string name="disableunipoint">Disable Unipoint </string>
+     <string name="enableunipoint">Enable Unipoint </string>
+</resources>

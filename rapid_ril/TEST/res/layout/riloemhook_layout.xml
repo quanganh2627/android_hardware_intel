@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+#
+# Copyright 2011 Intrinsyc Software International, Inc.  All rights reserved.
+#
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="fill_parent" android:layout_height="fill_parent">
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent">
+
+        <TextView android:id="@+id/mylabel" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/choose_ril_oem_api"/>
+
+        <RadioGroup android:id="@+id/radio_group_api" android:layout_width="fill_parent" android:layout_height="wrap_content" android:orientation="vertical">
+
+            <RadioButton android:id="@+id/radio_api1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api1"/>
+
+            <RadioButton android:id="@+id/radio_api2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api2"/>
+
+            <RadioButton android:id="@+id/radio_api3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api3"/>
+
+            <RadioButton android:id="@+id/radio_api4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api4"/>
+
+            <RadioButton android:id="@+id/radio_api5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api5"/>
+
+            <RadioButton android:id="@+id/radio_api6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api6"/>
+
+            <RadioButton android:id="@+id/radio_api7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api7"/>
+
+            <RadioButton android:id="@+id/radio_api8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api8"/>
+
+            <RadioButton android:id="@+id/radio_api9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api9"/>
+
+            <RadioButton android:id="@+id/radio_api10" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api10"/>
+
+            <RadioButton android:id="@+id/radio_api11" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api11"/>
+
+            <RadioButton android:id="@+id/radio_api12" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api11"/>
+
+            <RadioButton android:id="@+id/radio_api13" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_api11"/>
+
+      </RadioGroup>
+
+
+      <Button android:id="@+id/run" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/radio_run" android:clickable="true"  android:onClick="onRun"/>
+
+
+    </LinearLayout>
+</ScrollView>

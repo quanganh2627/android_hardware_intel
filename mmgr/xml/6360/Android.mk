@@ -1,0 +1,17 @@
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := mmgr_6360_conf_1.xml
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/telephony
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := mmgr_6360_xml
+LOCAL_MODULE_TAGS := optional
+LOCAL_REQUIRED_MODULES :=\
+    mmgr_6360_conf_1.xml\
+
+include $(BUILD_PHONY_PACKAGE)

@@ -47,8 +47,8 @@ struct module {
 #define MODULE_NOW RTLD_NOW
 #define MODUEL_GLOBAL RTLD_GLOBAL
 
-struct module *module_open(const char *path, int flag, void * preload);
-int module_close(struct module *module, unsigned int preload);
+struct module *module_open(const char *path, int flag);
+int module_close(struct module *module);
 void *module_symbol(struct module *module, const char *string);
 
 #ifdef __cplusplus

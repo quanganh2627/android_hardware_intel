@@ -2,24 +2,34 @@ ifeq ($(strip $(BOARD_USES_WRS_OMXIL_CORE)),true)
 
 LOCAL_PATH := $(call my-dir)
 
-#Version set to Android Jelly Bean
-NEED_VERSION := 4.1
-USE_ALOG := $(filter $(NEED_VERSION),$(firstword $(sort $(PLATFORM_VERSION) \
-                                   $(NEED_VERSION))))
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS_TO := khronos/openmax
 
-#Android Jelly Bean defined ALOGx, older versions use LOGx
-ifeq ($(USE_ALOG), $(NEED_VERSION))
-OMXLOG_CFLAGS := -DANDROID_ALOG
-else
-OMXLOG_CFLAGS := -DANDROID_LOG
-endif
+LOCAL_COPY_HEADERS := \
+    core/inc/khronos/openmax/include/OMX_IntelErrorTypes.h \
+    core/inc/khronos/openmax/include/OMX_IntelIndexExt.h \
+    core/inc/khronos/openmax/include/OMX_IntelVideoExt.h
+
+include $(BUILD_COPY_HEADERS)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := 10_wrs_omxil_core.cfg
-LOCAL_SRC_FILES := 10_wrs_omxil_core.cfg
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_TAGS := optional
-include $(BUILD_PREBUILT)
+LOCAL_COPY_HEADERS_TO := wrs_omxil_core
+LOCAL_COPY_HEADERS := \
+    base/inc/cmodule.h \
+    base/inc/componentbase.h \
+    base/inc/portaudio.h \
+    base/inc/portbase.h \
+    base/inc/portimage.h \
+    base/inc/portother.h \
+    base/inc/portvideo.h \
+    utils/inc/audio_parser.h \
+    utils/inc/list.h \
+    utils/inc/log.h \
+    utils/inc/module.h \
+    utils/inc/queue.h \
+    utils/inc/thread.h \
+    utils/inc/workqueue.h
+include $(BUILD_COPY_HEADERS)
 
 include $(CLEAR_VARS)
 
@@ -29,12 +39,12 @@ COMPONENT_SUPPORT_BUFFER_SHARING := false
 COMPONENT_SUPPORT_OPENCORE := false
 
 # core
-include $(WRS_OMXIL_CORE_ROOT)/core/src/Android.mk
+-include $(WRS_OMXIL_CORE_ROOT)/core/src/Android.mk
 
 # base class
-include $(WRS_OMXIL_CORE_ROOT)/base/src/Android.mk
+-include $(WRS_OMXIL_CORE_ROOT)/base/src/Android.mk
 
 # utility
-include $(WRS_OMXIL_CORE_ROOT)/utils/src/Android.mk
+-include $(WRS_OMXIL_CORE_ROOT)/utils/src/Android.mk
 
 endif

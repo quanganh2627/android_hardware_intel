@@ -21,7 +21,7 @@
 
 #include <OMX_Core.h>
 #include <OMX_Component.h>
-
+#include <OMX_IntelVideoExt.h>
 #include <portbase.h>
 
 class PortVideo : public PortBase
@@ -39,8 +39,8 @@ public:
     const OMX_VIDEO_PARAM_BITRATETYPE *GetPortBitrateParam(void);
     
     OMX_ERRORTYPE SetPortPrivateInfoParam(
-         const OMX_VIDEO_CONFIG_PRI_INFOTYPE *privateinfoparam, bool internal);
-    const OMX_VIDEO_CONFIG_PRI_INFOTYPE *GetPortPrivateInfoParam(void);
+         const struct OMX_VIDEO_CONFIG_PRI_INFOTYPE *privateinfoparam, bool internal);
+    const struct OMX_VIDEO_CONFIG_PRI_INFOTYPE *GetPortPrivateInfoParam(void);
 
     OMX_ERRORTYPE SetPortBufferSharingInfo(OMX_BOOL isbufsharing);
     const OMX_BOOL *GetPortBufferSharingInfo(void);
@@ -51,13 +51,12 @@ private:
 
     OMX_VIDEO_PARAM_BITRATETYPE bitrateparam;
     
-    OMX_VIDEO_CONFIG_PRI_INFOTYPE  privateinfoparam;
+    struct OMX_VIDEO_CONFIG_PRI_INFOTYPE  privateinfoparam;
 
     OMX_BOOL mbufsharing;
 };
-
 /* end of PortVideo */
-
+#if 0
 class PortAvc : public PortVideo
 {
 public:
@@ -66,43 +65,11 @@ public:
     OMX_ERRORTYPE SetPortAvcParam(const OMX_VIDEO_PARAM_AVCTYPE *p,
                                   bool overwrite_readonly);
     const OMX_VIDEO_PARAM_AVCTYPE *GetPortAvcParam(void);
-    const OMX_VIDEO_PARAM_PROFILELEVELTYPE *GetPortAvcProfileLevel(void);
 
 private:
     OMX_VIDEO_PARAM_AVCTYPE avcparam;
-    OMX_VIDEO_PARAM_PROFILELEVELTYPE avcprofilelevel;
 };
 
 /* end of PortAvc */
-class PortMpeg4 : public PortVideo
-{
-public:
-    PortMpeg4();
-
-    OMX_ERRORTYPE SetPortMpeg4Param(const OMX_VIDEO_PARAM_MPEG4TYPE *p,
-                                  bool overwrite_readonly);
-    const OMX_VIDEO_PARAM_MPEG4TYPE *GetPortMpeg4Param(void);
-
-private:
-    OMX_VIDEO_PARAM_MPEG4TYPE mpeg4param;
-};
-
-/* end of PortMpeg4 */
-
-
-class PortH263 : public PortVideo
-{
-public:
-    PortH263();
-
-    OMX_ERRORTYPE SetPortH263Param(const OMX_VIDEO_PARAM_H263TYPE *p,
-                                  bool overwrite_readonly);
-    const OMX_VIDEO_PARAM_H263TYPE *GetPortH263Param(void);
-
-private:
-    OMX_VIDEO_PARAM_H263TYPE h263param;
-};
-
-/* end of PortH263 */
-
+#endif
 #endif /* __PORTVIDEO_H */

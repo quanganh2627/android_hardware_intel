@@ -78,7 +78,10 @@ int queue_push_head(struct queue *queue, void *data)
 
 void __queue_push_tail(struct queue *queue, struct list *entry)
 {
-	queue->tail = list_add_tail(queue->tail, entry);
+        queue->tail = list_add_tail(queue->tail, entry);
+        if (queue->tail == NULL) {
+                return;
+        }
 	if (queue->tail->next)
 		queue->tail = queue->tail->next;
 	else
@@ -132,37 +135,6 @@ void *queue_pop_head(struct queue *queue)
 	}
 
 	return data;
-}
-
-void *queue_remove(struct queue *queue, void *data)
-{
-    struct list *entry;
-
-    if ( !queue->head ) return NULL;
-
-    entry = list_find(queue->head, data);
-    if ( NULL == entry ) {
-        // We didnt find this entry
-        return NULL;
-    }
-
-    // This entry is there in the list
-    if ( queue->head == entry ) {
-        // This is the first node
-        data = queue_pop_head(queue);
-        return data;
-    } else if ( queue->tail == entry ) {
-        // This is the tail node
-        data = queue_pop_tail(queue);
-        return data;
-    }
-
-    // This is and arbitary location, between head and tail
-	queue->length--;
-    __list_remove(entry, entry);
-    __list_free(entry);
-
-    return data;
 }
 
 struct list *__queue_pop_tail(struct queue *queue)

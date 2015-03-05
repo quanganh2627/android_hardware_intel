@@ -7,11 +7,12 @@ LOCAL_SRC_FILES := \
 	module.c \
 	thread.cpp \
 	workqueue.cpp \
+	audio_parser.c
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := libwrs_omxil_utils
 
-LOCAL_CFLAGS := $(OMXLOG_CFLAGS) -DLOG_TAG=\"omxil-utils\"
+LOCAL_CFLAGS :=
 
 LOCAL_CPPFLAGS :=
 

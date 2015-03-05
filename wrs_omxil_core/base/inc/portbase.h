@@ -23,11 +23,12 @@
 
 #include <OMX_Core.h>
 #include <OMX_Component.h>
-#ifdef ANDROID
-#include <utils/RefBase.h>
-#endif
+
 #include <list.h>
 #include <queue.h>
+
+typedef OMX_U8* CustomMemAlloc(OMX_U32 nSizeBytes, OMX_PTR pUserData);
+typedef void  CustomMemFree(OMX_U8 *pBuffer, OMX_PTR pUserData);
 
 class PortBase
 {
@@ -53,6 +54,11 @@ public:
                                OMX_CALLBACKTYPE *pCallbacks,
                                OMX_PTR pAppData);
     /* end of accessor */
+
+    OMX_ERRORTYPE SetMemAllocator(CustomMemAlloc *pMemAlloc, CustomMemFree *pMemFree, OMX_PTR pUserData);
+
+    /* set port buffer alignment, nAlignment=0 means alignment disabled */
+    OMX_ERRORTYPE SetMemAlignment(OMX_U32 nAlignment);
 
     /*
      * component methods & helpers
@@ -86,10 +92,12 @@ public:
     OMX_ERRORTYPE PushThisBuffer(OMX_BUFFERHEADERTYPE *pBuffer);
     OMX_BUFFERHEADERTYPE *PopBuffer(void);
     OMX_U32 BufferQueueLength(void);
-    OMX_ERRORTYPE RemoveThisBuffer(OMX_BUFFERHEADERTYPE *pBuffer);
+    OMX_U32 RetainedBufferQueueLength(void);
 
     /* Empty/FillBufferDone */
     OMX_ERRORTYPE ReturnThisBuffer(OMX_BUFFERHEADERTYPE *pBuffer);
+
+    OMX_ERRORTYPE RetainAndReturnBuffer(OMX_BUFFERHEADERTYPE *pRetain, OMX_BUFFERHEADERTYPE *pReturn);
 
     /* retain buffer */
     OMX_ERRORTYPE RetainThisBuffer(OMX_BUFFERHEADERTYPE *pBuffer,
@@ -99,6 +107,7 @@ public:
      * accumulated buffers to omx-il clients.
      */
     void ReturnAllRetainedBuffers(void);
+    void ReturnOneRetainedBuffer(void);
 
     /* flush all buffers not under processing */
     OMX_ERRORTYPE FlushPort(void);
@@ -116,10 +125,7 @@ public:
 
     /* EventHandler(OMX_EventPortSettingChanged) */
     OMX_ERRORTYPE ReportPortSettingsChanged(void);
-
-    /* EventHandler(OMX_IndexConfigCommonOutputCrop) */
-    OMX_ERRORTYPE ReportConfigOutputCrop(void);
-
+    OMX_ERRORTYPE ReportOutputCrop(void);
     /* get frame size */
     OMX_U32 getFrameBufSize(OMX_COLOR_FORMATTYPE colorFormat, OMX_U32 width, OMX_U32 height);
 
@@ -161,6 +167,12 @@ private:
     OMX_U8 state;
     pthread_mutex_t state_lock;
 
+    CustomMemAlloc *custom_mem_alloc;
+    CustomMemFree *custom_mem_free;
+    OMX_PTR custom_mem_userdata;
+
+    OMX_U32 mem_alignment;
+
     /* parameter */
     OMX_PARAM_PORTDEFINITIONTYPE portdefinition;
     /* room for portdefinition.format.*.cMIMEType */
@@ -173,10 +185,16 @@ private:
 
     /* omx standard callbacks */
     OMX_PTR appdata;
-    OMX_CALLBACKTYPE callbacks;
+    OMX_CALLBACKTYPE *callbacks;
 
     /* wrs component handle */
     class ComponentBase *cbase;
+
+    /* Input port size limit. The limit is set to be the size of a 1080P 4:4:4 raw image size,
+       which is 1920x1080x3. */
+    enum {
+        MAX_INPUT_PORT_SIZE = 6220800
+    };
 };
 
 /* end of PortBase */

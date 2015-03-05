@@ -25,6 +25,9 @@
 #include <componentbase.h>
 #include <portimage.h>
 
+#define LOG_TAG "portimage"
+#include <log.h>
+
 PortImage::PortImage()
 {
     memset(&imageparam, 0, sizeof(imageparam));

@@ -22,7 +22,8 @@
 
 #include <module.h>
 
-#include <sysdeps.h>
+#define LOG_TAG "module"
+#include <log.h>
 
 static struct module *g_module_head;
 static char *g_module_err;
@@ -119,7 +120,7 @@ const char *module_error(void)
     return g_module_err;
 }
 
-struct module *module_open(const char *file, int flag, void *preload)
+struct module *module_open(const char *file, int flag)
 {
     struct module *new, *existing;
     void *handle;
@@ -130,7 +131,7 @@ struct module *module_open(const char *file, int flag, void *preload)
 
     existing = module_find_with_name(g_module_head, file);
     if (existing) {
-        omx_errorLog("found opened module %s\n", existing->name);
+        LOGE("found opened module %s with name\n", existing->name);
         existing->ref_count++;
         pthread_mutex_unlock(&g_lock);
         return existing;
@@ -145,25 +146,19 @@ struct module *module_open(const char *file, int flag, void *preload)
     new->ref_count = 1;
     new->priv = NULL;
     new->next = NULL;
+    new->handle = NULL;
 
-    dlerror();
-    if(preload) {
-        new->handle= preload;
-    }
-    else {
-        new->handle = dlopen(file, flag);
+    new->handle = dlopen(file, flag);
+    if (!(new->handle)) {
+        LOGE("dlopen failed (%s)\n", file);
         dlerr = dlerror();
-        if (dlerr) {
-            omx_errorLog("dlopen failed (%s)\n", dlerr);
-            module_set_error(dlerr);
-            pthread_mutex_unlock(&g_lock);
-            goto free_new;
-        }
+        module_set_error(dlerr);
+        goto free_new;
     }
 
     existing = module_find_with_handle(g_module_head, new->handle);
     if (existing) {
-        omx_errorLog("found opened module %s\n", existing->name);
+        LOGE("found opened module %s with handle\n", existing->name);
         existing->ref_count++;
 
         free(new);
@@ -171,17 +166,21 @@ struct module *module_open(const char *file, int flag, void *preload)
         return existing;
     }
 
+    new->name = strdup(file);
+    if (!new->name) {
+        goto free_handle;
+    }
+
     dlerror();
     new->init = dlsym(new->handle, "module_init");
     dlerr = dlerror();
-    if (!dlerr) {
-        omx_errorLog("module %s has init(), call the symbol\n", new->name);
+    if (!dlerr && new->init) {
+        LOGE("module %s has init(), call the symbol\n", new->name);
         init_ret = new->init(new);
     }
 
     if (init_ret) {
-        omx_errorLog("module %s init() failed (%d)\n", new->name, init_ret);
-        pthread_mutex_unlock(&g_lock);
+        LOGE("module %s init() failed (%d)\n", new->name, init_ret);
         goto free_handle;
     }
 
@@ -190,13 +189,6 @@ struct module *module_open(const char *file, int flag, void *preload)
     dlerr = dlerror();
     if (dlerr)
         new->exit = NULL;
-
-    new->name = strdup(file);
-    if (!new->name) {
-        if (new->exit)
-            new->exit(new);
-        goto free_handle;
-    }
 
     g_module_head = module_add_list(g_module_head, new);
 
@@ -213,7 +205,7 @@ free_new:
     return NULL;
 }
 
-int module_close(struct module *module, unsigned int preload)
+int module_close(struct module *module)
 {
     const char *dlerr;
     int ret = 0;
@@ -226,30 +218,22 @@ int module_close(struct module *module, unsigned int preload)
     module->ref_count--;
     ret = module->ref_count;
 
-    omx_verboseLog("module %s decrease refcont (%d)\n", module->name, module->ref_count);
+    LOGV("module %s decrease refcont (%d)\n", module->name, module->ref_count);
 
     if (!module->ref_count) {
         if (module->exit)
             module->exit(module);
 
-        if (!preload) {
-            dlerror();
-            dlclose(module->handle);
-            dlerr = dlerror();
-            if (dlerr) {
-                module_set_error(dlerr);
-                ret = -1;
-            }
+        if (dlclose(module->handle)) {
+            LOGE("module %s dlclose failed",module->name);
         }
 
         g_module_head = module_del_list(g_module_head, module);
 
-        omx_verboseLog("module %s closed\n", module->name);
+        LOGV("module %s closed\n", module->name);
 
-        if (!preload) {
-            free(module->name);
-            free(module);
-        }
+        free(module->name);
+        free(module);
     }
 
     pthread_mutex_unlock(&g_lock);
@@ -258,7 +242,7 @@ int module_close(struct module *module, unsigned int preload)
 
 void *module_symbol(struct module *module, const char *string)
 {
-    void *symbol;
+    void *symbol = NULL;
     const char *dlerr;
 
     if (!module || !module->handle || !string)
@@ -266,17 +250,16 @@ void *module_symbol(struct module *module, const char *string)
 
     pthread_mutex_lock(&g_lock);
 
-    dlerror();
     symbol = dlsym(module->handle, string);
-    dlerr = dlerror();
-    if (dlerr) {
-        omx_errorLog("not founded symbol %s in module %s (%s)\n",
+    if (!symbol) {
+        dlerr = dlerror();
+        LOGE("not founded symbol %s in module %s (%s)\n",
              string, module->name, dlerr);
         module_set_error(dlerr);
         symbol = NULL;
     }
     else
-        omx_verboseLog("found symbol %s in module %s", string, module->name);
+        LOGV("found symbol %s in module %s\n", string, module->name);
 
     pthread_mutex_unlock(&g_lock);
     return symbol;

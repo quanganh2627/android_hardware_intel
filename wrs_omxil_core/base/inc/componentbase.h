@@ -21,21 +21,20 @@
 
 #include <OMX_Core.h>
 #include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-
+#include <OMX_IntelIndexExt.h>
 #include <cmodule.h>
 #include <portbase.h>
 
 #include <queue.h>
 #include <workqueue.h>
 
-
 /* retain buffers */
 typedef enum buffer_retain_e {
     BUFFER_RETAIN_NOT_RETAIN = 0,
     BUFFER_RETAIN_GETAGAIN,
     BUFFER_RETAIN_ACCUMULATE,
-    BUFFER_RETAIN_PUSHBACK,
+    BUFFER_RETAIN_OVERRIDDEN,
+    BUFFER_RETAIN_CACHE,
 } buffer_retain_t;
 
 /* ProcessCmdWork */
@@ -43,52 +42,6 @@ struct cmd_s {
     OMX_COMMANDTYPE cmd;
     OMX_U32 param1;
     OMX_PTR cmddata;
-};
-
-typedef struct param_struct {
-         OMX_STRING sParamString;
-         OMX_INDEXTYPE sIndex;
-         OMX_ERRORTYPE sRetValue;
-    } param_struct_t;
-
-enum {
-  NUM_EXT_PARAMS = 8,  // number of parameter extensions we are supporting right now.
-};
-
-// Parameter Extension Array.
-const param_struct_t PARAMEXT[NUM_EXT_PARAMS] = {
-     { "OMX.google.android.index.enableAndroidNativeBuffers",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamGoogleNativeBuffers),
-       OMX_ErrorNone
-     },
-     { "OMX.google.android.index.getAndroidNativeBufferUsage",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamGoogleNativeBufferUsage),
-       OMX_ErrorNone
-     },
-     { "OMX.google.android.index.storeMetaDataInBuffers",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamGoogleMetaDataInBuffers),
-       OMX_ErrorNone
-     },
-     { "OMX.google.android.index.useAndroidNativeBuffer2",
-       static_cast<OMX_INDEXTYPE>(NULL),
-       OMX_ErrorNone
-     },
-     {"OMX.google.android.index.useAndroidNativeBuffer",
-       static_cast<OMX_INDEXTYPE>(NULL),
-       OMX_ErrorNotImplemented
-     },
-     {"OMX.Intel.index.ThumbnailMode",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamGoogleThumbNail),
-       OMX_ErrorNone
-     },
-     {"OMX.Intel.index.useXDisplay",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamIntelXDisplay),
-       OMX_ErrorNone
-     },
-     {"OMX.Intel.index.GlxPictures",
-       static_cast<OMX_INDEXTYPE>(OMX_IndexParamIntelGlxPictures),
-       OMX_ErrorNone
-     }
 };
 
 class CmdHandlerInterface
@@ -162,18 +115,6 @@ public:
     /*
      * component methods & helpers
      */
-    static OMX_ERRORTYPE GetComponentVersion(
-        OMX_IN  OMX_HANDLETYPE hComponent,
-        OMX_OUT OMX_STRING pComponentName,
-        OMX_OUT OMX_VERSIONTYPE* pComponentVersion,
-        OMX_OUT OMX_VERSIONTYPE* pSpecVersion,
-        OMX_OUT OMX_UUIDTYPE* pComponentUUID);
-    OMX_ERRORTYPE CBaseGetComponentVersion(
-        OMX_IN  OMX_HANDLETYPE hComponent,
-        OMX_OUT OMX_STRING pComponentName,
-        OMX_OUT OMX_VERSIONTYPE* pComponentVersion,
-        OMX_OUT OMX_VERSIONTYPE* pSpecVersion,
-        OMX_OUT OMX_UUIDTYPE* pComponentUUID);
 
     static OMX_ERRORTYPE SendCommand(
         OMX_IN  OMX_HANDLETYPE hComponent,
@@ -238,19 +179,6 @@ public:
         OMX_IN  OMX_HANDLETYPE hComponent,
         OMX_OUT OMX_STATETYPE* pState);
 
-    static OMX_ERRORTYPE ComponentTunnelRequest(
-        OMX_IN  OMX_HANDLETYPE hComp,
-        OMX_IN  OMX_U32 nPort,
-        OMX_IN  OMX_HANDLETYPE hTunneledComp,
-        OMX_IN  OMX_U32 nTunneledPort,
-        OMX_INOUT  OMX_TUNNELSETUPTYPE* pTunnelSetup);
-    OMX_ERRORTYPE CBaseComponentTunnelRequest(
-        OMX_IN  OMX_HANDLETYPE hComp,
-        OMX_IN  OMX_U32 nPort,
-        OMX_IN  OMX_HANDLETYPE hTunneledComp,
-        OMX_IN  OMX_U32 nTunneledPort,
-        OMX_INOUT  OMX_TUNNELSETUPTYPE* pTunnelSetup);
-
     static OMX_ERRORTYPE UseBuffer(
         OMX_IN OMX_HANDLETYPE hComponent,
         OMX_INOUT OMX_BUFFERHEADERTYPE** ppBufferHdr,
@@ -311,24 +239,6 @@ public:
         OMX_IN  OMX_CALLBACKTYPE* pCallbacks,
         OMX_IN  OMX_PTR pAppData);
 
-    static OMX_ERRORTYPE ComponentDeInit(
-        OMX_IN  OMX_HANDLETYPE hComponent);
-    OMX_ERRORTYPE CBaseComponentDeInit(
-        OMX_IN  OMX_HANDLETYPE hComponent);
-
-    static OMX_ERRORTYPE UseEGLImage(
-        OMX_IN OMX_HANDLETYPE hComponent,
-        OMX_INOUT OMX_BUFFERHEADERTYPE** ppBufferHdr,
-        OMX_IN OMX_U32 nPortIndex,
-        OMX_IN OMX_PTR pAppPrivate,
-        OMX_IN void* eglImage);
-    OMX_ERRORTYPE CBaseUseEGLImage(
-        OMX_IN OMX_HANDLETYPE hComponent,
-        OMX_INOUT OMX_BUFFERHEADERTYPE** ppBufferHdr,
-        OMX_IN OMX_U32 nPortIndex,
-        OMX_IN OMX_PTR pAppPrivate,
-        OMX_IN void* eglImage);
-
     static OMX_ERRORTYPE ComponentRoleEnum(
         OMX_IN OMX_HANDLETYPE hComponent,
         OMX_OUT OMX_U8 *cRole,
@@ -356,11 +266,15 @@ public:
                                           OMX_U32 *nr_roles, OMX_U8 **roles);
 
     /* end of helper method for queury_roles() */
+
 protected:
     /* helpers for derived class */
     const OMX_COMPONENTTYPE *GetComponentHandle(void);
-
+#if 0
     void DumpBuffer(const OMX_BUFFERHEADERTYPE *bufferheader, bool dumpdata);
+#endif
+    /* check if all port has own pending buffer */
+    virtual bool IsAllBufferAvailable(void);
 
     /* end of helpers for derived class */
 
@@ -374,6 +288,12 @@ protected:
 
     /* ports big lock, must be held when accessing all ports at one time */
     pthread_mutex_t ports_block;
+
+    /* adaptive playback param */
+    OMX_BOOL mEnableAdaptivePlayback;
+
+    /* whether to force buffer reallocation */
+    OMX_BOOL mForceBufferRealloc;
 
 private:
     /* common routines for constructor */
@@ -441,43 +361,39 @@ private:
     /* buffer processing */
     /* implement WorkableInterface */
     virtual void Work(void); /* handle this->ports, hold ports_block */
-    /* check if all port has own pending buffer */
-    bool IsAllBufferAvailable(void);
 
     /* called in Work() after ProcessorProcess() */
-    void PostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
+    void PostProcessBuffers(OMX_BUFFERHEADERTYPE ***buffers,
                             const buffer_retain_t *retain);
-    void SourcePostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
+    void SourcePostProcessBuffers(OMX_BUFFERHEADERTYPE ***buffers,
                                   const buffer_retain_t *retain);
-    void FilterPostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
+    void FilterPostProcessBuffers(OMX_BUFFERHEADERTYPE ***buffers,
                                   const buffer_retain_t *retain);
-    void SinkPostProcessBuffers(OMX_BUFFERHEADERTYPE **buffers,
+    void SinkPostProcessBuffers(OMX_BUFFERHEADERTYPE ***buffers,
                                 const buffer_retain_t *retain);
 
     /* processor callbacks */
     /* TransState */
-    virtual OMX_ERRORTYPE ProcessorInit(void * parser_handle);  /* Loaded to Idle */
+    virtual OMX_ERRORTYPE ProcessorInit(void);  /* Loaded to Idle */
     virtual OMX_ERRORTYPE ProcessorDeinit(void);/* Idle to Loaded */
     virtual OMX_ERRORTYPE ProcessorStart(void); /* Idle to Executing/Pause */
+    virtual OMX_ERRORTYPE ProcessorReset(void); /* Reset */
     virtual OMX_ERRORTYPE ProcessorStop(void);  /* Executing/Pause to Idle */
     virtual OMX_ERRORTYPE ProcessorPause(void); /* Executing to Pause */
     virtual OMX_ERRORTYPE ProcessorResume(void);/* Pause to Executing */
     virtual OMX_ERRORTYPE ProcessorFlush(OMX_U32 port_index); /* Flush */
+    virtual OMX_ERRORTYPE ProcessorPreFillBuffer(OMX_BUFFERHEADERTYPE* buffer);
+    virtual OMX_ERRORTYPE ProcessorPreEmptyBuffer(OMX_BUFFERHEADERTYPE* buffer);
 
+    /* invoked when buffer is to be freed */
+    virtual OMX_ERRORTYPE ProcessorPreFreeBuffer(OMX_U32 nPortIndex, OMX_BUFFERHEADERTYPE* pBuffer);
     /* Work */
-    virtual OMX_ERRORTYPE ProcessorProcess(OMX_BUFFERHEADERTYPE **buffers,
+    virtual OMX_ERRORTYPE ProcessorProcess(OMX_BUFFERHEADERTYPE ***pBuffers,
                                            buffer_retain_t *retain,
-                                           OMX_U32 nr_buffers) = 0;
-
-    /* invoked when buffer is to be filled */
-    virtual  OMX_ERRORTYPE ProcessorPreFillBuffer(OMX_BUFFERHEADERTYPE* pBuffer);
-
-    virtual OMX_ERRORTYPE ProcessorEnableNativeBuffers(void);
-    /* pass NativeBuffers to Lower levels at initialization only */
-    virtual  OMX_ERRORTYPE ProcessorUseNativeBuffer(OMX_U32 nPortIndex, OMX_BUFFERHEADERTYPE* pBuffer);
-
-    /* release lock held by libmix */
-    virtual OMX_ERRORTYPE ProcessorReleaseLock(void);
+                                           OMX_U32 nr_buffers);
+    virtual OMX_ERRORTYPE ProcessorProcess(OMX_BUFFERHEADERTYPE **pBuffers,
+                                           buffer_retain_t *retain,
+                                           OMX_U32 nr_buffers);
 
     /* end of component methods & helpers */
 
@@ -516,17 +432,22 @@ private:
 
     /* omx standard callbacks */
     OMX_PTR appdata;
-    OMX_CALLBACKTYPE callbacks;
-
+    OMX_CALLBACKTYPE *callbacks;
 
     /* component name */
     char name[OMX_MAX_STRINGNAME_SIZE];
+
+    /* state lock */
+    pthread_mutex_t state_block;
+
+    OMX_U32 mMaxFrameWidth;
+    OMX_U32 mMaxFrameHeight;
 
     /* omx specification version */
 #ifndef ANDROID
     const static OMX_U8 OMX_SPEC_VERSION_MAJOR = 1;
     const static OMX_U8 OMX_SPEC_VERSION_MINOR = 1;
-    const static OMX_U8 OMX_SPEC_VERSION_REVISION = 0;
+    const static OMX_U8 OMX_SPEC_VERSION_REVISION = 2;
     const static OMX_U8 OMX_SPEC_VERSION_STEP = 0;
 #else
     const static OMX_U8 OMX_SPEC_VERSION_MAJOR = 1;
