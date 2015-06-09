@@ -1,0 +1,9 @@
+Switch compilation flag:
+------------------------
+
+By default, all gcov modules are not compiled. You need to set
+the compilation flag to enable it.
+
+You just have to set a flag when you execute the make in console:
+* At Android root: make mmgr mmgr_gcov=true
+* in mmgr: mm mmgr_gcov=true

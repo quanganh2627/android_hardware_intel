@@ -1,0 +1,201 @@
+/*!
+
+\mainpage libcamera2 Design Documentation
+
+\section overview Overview
+
+libcamera2 is the library that implements the Camera HAL components as
+described by Android.
+
+\section gettingstarted Where to start, important classes
+
+\li android::ControlThread implements the HAL main loop.
+\li AtomHAL.cpp is the interface implmenting the Android HAL C API defined in camera.h
+\li android::AtomISP implements the kernel interface.
+\li Worker threads: 1) android::PictureThread, 2) android::PreviewThread, 3) android::CallbacksThread
+
+\section principles Main design principles
+
+The growing pains of the first iteration have help define clear design
+goals for this second iteration
+
+\subsection princip1 1. Sequential processing of client requests
+
+As opposed to current design all, now all requests from HAL client
+(the camera service) are processed in sequence. Only the main
+ControlThread decides what can be run in parallel in other Threads
+
+\subsection princip2 2. Clear Encapsulation
+
+Adopt traditional OOP design of clearly encapsulating the operations
+required in the HAL. Each task is clearly encapsulated inside a Thread
+object. The roles for each thread are clearly defined and contain no
+state. Only the Control Thread is aware of the HAL global state.
+
+\subsection princip3 3. Simple Multi-threading
+
+HAL operations need to be run in parallel. The need for
+multi-threading is clear. The new design tries to provide a clean
+interface between threads. The key construct is a Message Queue. All
+threads have one. Communication between Threads is done on a message
+basis. Message can be send synchronously or asynchronously. The Queue
+will ensure that they are processed sequentially, but it is flexible
+enough to allow the sending entity to be blocked or not until the
+processing completes. This reduces drastically the number of locks.
+
+Messages in the queue can also be flushed.
+
+Each threads is a loop processing its own message queue.
+
+\subsection princip4 4. Platform Scalability
+
+The new design tries to tackle the challenging task of supporting
+multiple HW platform and products while keeping the HAL codeline as HW
+independent as possible. There are others activities, no only in the
+HAL, towards this goal.
+
+This is achieved by having a centralized platform specification that
+the libcamera2 can query for HW specific information.
+
+\section jpegbufflow JPEG encoder buffer flow
+
+\subsection input  Encoder input buffer flow
+The snapshot buffers are allocated currently by the Picture Thread
+An allocation request is sent from ControlThread to the PictureThread in 
+either of these two situations:
+- after preview has started.
+- when the snapshot resolution changes
+After allocation the PictureThread initializes the HW encoder with the pre-allocated
+buffers. At this stage the HW encoder creates surfaces from those buffers and also
+creates the libVA encoding context
+
+During the take_picture sequence the ControlThread retrieves the current snapshot
+buffers from the PictureThread and passes those to the AtomISP class to start
+the device for capture.
+
+There is no need to return the buffers to the PictureThread when going back to
+the preview state. The PictureThread will de-allocate the buffers when it is
+destroyed.
+
+\subsection output Encoder output buffer flow
+The PictureThread instance allocates a couple of buffers used to store the
+Thumbnail image (if there is one) and the EXIF data. The allocation of both buffers
+is done before encode. They belong to the PictureThread and will be freed in the
+destructor
+
+When an encode request arrives to PicThread it allocates the buffer that will
+contain the final EXIF data plus the main JPEG. This allocation is done once
+the size of each element is known.
+The contents of the HW encoding process are copied directly to this buffer from
+the internal VACoded buffer. This memcopy is currently unavoidable.
+
+The JPEG buffer is sent to the callback thread that will release the memory
+once the user callback has completed
+
+\subsection interencode Interleaved encoding
+The encoding process of thumbnail(a.k.a. postview) and main image (a.k.a. snapshot)
+is currently interleaved. The HW encoder is configured to start the main image
+encoding first and then the thumbnail is encoded using the SW encoder.
+Once the thumbnail is completed we wait for the HW encoder to finish and compose
+the final buffer (EXIF+JPEG).
+
+In this way the thumbnail encoding time is not affecting the overall JPEG encoding
+
+
+\section contcapture Continuous Capture Design
+
+\subsection ccoverview Overview
+
+Continuous Capture is a feature of CSS v1.5 video firmware, which allows
+to run multiple pipelines in parallel. This mechanism enables multiple
+end-user features such as Zero-Shutter-Lag, Time Nudge and Continuous Viewfinder.
+
+\subsection ccseq Sequence diagrams
+
+User-space kernel interaction when continuous capture is started (application
+start).
+
+\msc
+  hscale="3", width="1024";
+  ui [ label="Camera UI"], controlthread [ label="HAL ControlThread"], userisp [label="HAL AtomISP"],kernelisp [label="Kernel atomisp"];
+  ui rbox controlthread [ label = "startPreview()" ];
+  controlthread rbox userisp [ label = "start continuous-capture" ];
+  userisp rbox kernelisp [label = "config: IOC_S_FMT and IOC_REQBUFS for /dev/video0 (main capture "] ;
+  userisp rbox kernelisp [label = "config: IOC_S_FMT and IOC_REQBUFS for /dev/video1 (postview) "] ;
+  userisp rbox kernelisp [label = "config: IOC_FMT and IOC_REQBUFS for /dev/video2 (preview) "] ;
+  userisp rbox kernelisp [label = "start preview: IOC_QBUF and IOC_STREAMON /dev/video2 (preview) "] ;
+  userisp rbox kernelisp [label = "prepare capture: IOC_QBUF to /dev/video0 (main capture) "] ;
+  userisp rbox kernelisp [label = "prepare capture: IOC_QBUF to /dev/video1 (postview) "] ;
+  --- [ label = "NOTE: main and postview devices not started yet" ] ;
+  userisp rbox kernelisp [label = "data flow starts: IOC_DQBUF from /dev/video2 (preview) "] ;
+\endmsc
+
+User-kernel interaction when picture is taken:
+
+\msc
+  hscale="3", width="1024";
+  ui [ label="Camera UI"], controlthread [ label="HAL ControlThread"], userisp [label="HAL AtomISP"],kernelisp [label="Kernel atomisp"];
+  --- [ label = "preview is running, frames dequeued from /dev/video2" ];
+  ui rbox controlthread [ label = "takePicture" ];
+  controlthread rbox userisp [ label = "requestCapture" ];
+  userisp rbox kernelisp [ label = "config ZSL/timenudge IOC_S_CONT_CAPTURE_CONFIG" ];
+  userisp rbox kernelisp [ label = "start capture: IOC_STREAMON for /dev/video0 (main)" ];
+  userisp rbox kernelisp [ label = "start capture: IOC_STREAMON for /dev/video1 (postview)" ];
+  --- [ label = "all three devices nodes active" ];
+  userisp rbox kernelisp [label = "data flow starts: IOC_DQBUF from /dev/video0, /dev/video1 and /dev/video1"] ;
+  --- [ label = "ISP has delivered the requested frame, or burst of frames"];
+  userisp rbox kernelisp [ label = "stop capture: IOC_STREAMOFF for /dev/video0 (main)" ];
+  userisp rbox kernelisp [ label = "stop capture: IOC_STREAMOFF for /dev/video1 (postview)" ];
+  --- [ label = "NOTE: preview continues" ] ;
+  userisp rbox kernelisp [label = "data flow starts: IOC_DQBUF from /dev/video2 (preview) "] ;
+
+\endmsc
+
+Panorama capture sequence (simplified logical sequence, omitting much of message handling)
+
+\msc
+  hscale="3", width="1024";
+  client [ label="Client app"], controlthread [ label="ControlThread"], postprocthread [label="PostProcThread"], panoramathread [label="PanoramaThread"], picturethread [label="PictureThread"], callbacksthread [label="CallbackThread"];
+  --- [ label = "preview is running" ];
+  client=>>controlthread [ label = "startPanorama" ];
+  controlthread=>>panoramathread [ label = "startPanorama" ];
+  client=>>controlthread [ label = "takePicture" ];
+  controlthread=>>panoramathread [ label = "startPanoramaCapture" ];
+  --- [ label = "first capture" ];
+  controlthread=>>postprocthread [ label = "sendFrame(preview)" ];
+  postprocthread=>>panoramathread [ label = "sendFrame(preview)" ];
+  panoramathread=>panoramathread [ label = "handleFrame(preview)" ];
+  panoramathread=>>controlthread [ label = "panoramaCaptureTrigger" ];
+  controlthread=>controlthread [ label = "capturePanoramaPic" ];
+  controlthread=>panoramathread [ label = "stitch(snapshot)" ];
+  panoramathread=>>callbacksthread [ label = "panoramaSnapshot" ];
+  callbacksthread=>>client [ label = "onSnapshotTaken" ];
+  --- [ label = "loop start - these continue until max count of snapshots is taken or takePicture is called again" ];
+  --- [ label = "loop start - these continue until overlap is sufficient" ];
+  controlthread=>postprocthread [ label = "sendFrame(preview)" ];
+  postprocthread=>>panoramathread [ label = "sendFrame(preview)" ];
+  panoramathread=>panoramathread [ label = "handleFrame(preview)" ];
+  panoramathread=>panoramathread [ label = "detectOverlap" ];
+  panoramathread=>>callbacksthread [ label = "panoramaDisplUpdate" ];
+  callbacksthread=>>client [ label = "onDisplacementChange" ];
+  --- [ label = "loop end (overlap detection)" ];
+  panoramathread=>>controlthread [ label = "panoramaCaptureTrigger" ];
+  controlthread=>controlthread [ label = "capturePanoramaPic" ];
+  controlthread=>panoramathread [ label = "stitch(snapshot)" ];
+  panoramathread=>>callbacksthread [ label = "panoramaSnapshot" ];
+  callbacksthread=>>client [ label = "onSnapshotTaken" ];
+  --- [ label = "loop end (panorama capturing)" ];
+  client=>>controlthread [ label = "takePicture" ];
+  controlthread=>>panoramathread [ label = "finalize" ];
+  panoramathread=>controlthread [ label = "panoramaFinalized" ];
+  controlthread=>>picturethread [ label = "encode(panorama)" ];
+  --- [ label = "jpeg encoding parts omitted from sequence" ];
+  callbacksthread=>>client [ label = "onPictureTaken" ];
+  callbacksthread=>>controlthread [ label = "pictureDone" ];
+  controlthread=>panoramathread [ label = "returnBuffer" ];
+  --- [ label = "after user chooses to stop taking panorama images" ];
+  client=>>controlthread [ label = "stopPanorama" ];
+  controlthread=>>panoramathread [ label = "stopPanorama" ];
+\endmsc
+
+*/

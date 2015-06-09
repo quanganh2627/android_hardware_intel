@@ -1,0 +1,37 @@
+# STM external FW info
+
+# link to STM FW build:
+FW_LOCATION=REMOVED
+
+# P4 changelist id(unique id):
+FW_CHANGE_LIST=52118
+
+# STM build tag(Wibars Tracker):
+FW_TIC=WFFW05937
+
+# P4 DEPOT (repository):
+FW_DEPOT=WCS_WIFI_FW
+
+# P4 branch:
+FW_STREAM=CoreCycle1_stab_linux
+
+# job submitter name:
+FW_SUBMITTER_NAME=scmbuild
+
+
+# internal FW info
+
+# jenkins project name
+FW_BUILD_NAME=fw-binary-push-CoreCycle1_stab
+
+# jenkins project job number
+FW_PARAMETER=122
+
+# FW job full URL
+FW_BUILD_URL=REMOVED
+
+# jenkins FW job name
+FW_JOB_NAME=fw-binary-push-CoreCycle1_stab
+
+# windows style link to firmware build:
+FW_LOCATION_WIN=REMOVED
