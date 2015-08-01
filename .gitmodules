@@ -1,6 +1,21 @@
 [submodule "libcamera2"]
 	path = libcamera2
 	url = /home/quanganh2627/ww47/vendor/intel/hardware/libcamera2
+[submodule "libintelprov"]
+	path = libintelprov
+	url = /home/quanganh2627/ww41/vendor/intel/hardware/libintelprov
+[submodule "libsensorhub"]
+	path = libsensorhub
+	url = /home/quanganh2627/ww41/vendor/intel/hardware/libsensorhub
+[submodule "rapid_ril"]
+	path = rapid_ril
+	url = /home/quanganh2627/ww41/vendor/intel/hardware/rapid_ril
+[submodule "apache-harmony"]
+	path = apache-harmony
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/apache-harmony
+[submodule "bcm_gps"]
+	path = bcm_gps
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/bcm_gps
 [submodule "libcodec_offload"]
 	path = libcodec_offload
 	url = /home/quanganh2627/ww47/vendor/intel/hardware/libcodec_offload
