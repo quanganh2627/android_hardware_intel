@@ -1,0 +1,93 @@
+[submodule "libcamera2"]
+	path = libcamera2
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libcamera2
+[submodule "libcodec_offload"]
+	path = libcodec_offload
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libcodec_offload
+[submodule "libmedia_utils"]
+	path = libmedia_utils
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libmedia_utils
+[submodule "libdrm"]
+	path = libdrm
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libdrm
+[submodule "ia_watchdog"]
+	path = ia_watchdog
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/ia_watchdog
+[submodule "keymaster"]
+	path = keymaster
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/keymaster
+[submodule "txei"]
+	path = txei
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/txei
+[submodule "wrs_omxil_core"]
+	path = wrs_omxil_core
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/wrs_omxil_core
+[submodule "libva"]
+	path = libva
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libva
+[submodule "em_common"]
+	path = em_common
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/em_common
+[submodule "libstagefrighthw"]
+	path = libstagefrighthw
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libstagefrighthw
+[submodule "libmix"]
+	path = libmix
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libmix
+[submodule "libcamerausb"]
+	path = libcamerausb
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libcamerausb
+[submodule "mfld_cdk"]
+	path = mfld_cdk
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/mfld_cdk
+[submodule "psb_video"]
+	path = psb_video
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/psb_video
+[submodule "camera_extension"]
+	path = camera_extension
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/camera_extension
+[submodule "omx-components"]
+	path = omx-components
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/omx-components
+[submodule "healthd"]
+	path = healthd
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/healthd
+[submodule "audio_media"]
+	path = audio_media
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/audio_media
+[submodule "mmgr"]
+	path = mmgr
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/mmgr
+[submodule "bluetooth"]
+	path = bluetooth
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/bluetooth
+[submodule "libwsbm"]
+	path = libwsbm
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libwsbm
+[submodule "utilities"]
+	path = utilities
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/audiocomms/utilities
+[submodule "fw-binary-public"]
+	path = fw-binary-public
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/PRIVATE/wlan/fw-binary-public
+[submodule "hostap-public"]
+	path = hostap-public
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/PRIVATE/wlan/hostap-public
+[submodule "iwlwifi-stack-public"]
+	path = iwlwifi-stack-public
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/PRIVATE/wlan/iwlwifi-stack-public
+[submodule "ufo"]
+	path = ufo
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/PRIVATE/ufo
+[submodule "audio-hal"]
+	path = audio-hal
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/PRIVATE/audiocomms/audio-hal
+[submodule "liblights"]
+	path = liblights
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/liblights
+[submodule "psb_headers"]
+	path = psb_headers
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/psb_headers
+[submodule "libmultidisplay"]
+	path = libmultidisplay
+	url = /home/quanganh2627/ww47/vendor/intel/hardware/libmultidisplay
