@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-  <string name="sep_permission_label">SEP Access</string>
-  <string name="sep_permission_description">Applications with this permission will be able
-  use the Security Engine (SEP).</string>
-</resources>

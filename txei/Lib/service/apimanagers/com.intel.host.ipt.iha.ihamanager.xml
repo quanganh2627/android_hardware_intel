@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<permissions>
-  <library name="com.intel.host.ipt.iha.ihamanager"
-    file="/system/framework/com.intel.host.ipt.iha.ihamanager.jar"/>
-</permissions>

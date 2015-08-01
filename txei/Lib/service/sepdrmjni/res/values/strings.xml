@@ -1,7 +1,0 @@
-<resources>
-
-    <string name="app_name">SecurityTestApp</string>
-    <string name="sep_access_permission_label">SEP Access</string>
-    <string name="sep_access_permission_description">Applications with this permission are allowed to access the Security Processor</string>
-
-</resources>
