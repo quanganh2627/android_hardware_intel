@@ -10,6 +10,12 @@
 [submodule "rapid_ril"]
 	path = rapid_ril
 	url = /home/quanganh2627/ww41/vendor/intel/hardware/rapid_ril
+[submodule "rfid"]
+	path = rfid
+	url = /home/quanganh2627/ww41/vendor/intel/hardware/rfid
+[submodule "sensors"]
+	path = sensors
+	url = /home/quanganh2627/ww41/vendor/intel/hardware/sensors
 [submodule "apache-harmony"]
 	path = apache-harmony
 	url = /home/quanganh2627/ww47/vendor/intel/hardware/apache-harmony
